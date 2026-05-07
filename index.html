@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>YJ — 今日指揮中心</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -707,81 +708,126 @@ function addStat(key) {
 }
 renderStats();
 
-// ─── TASKS (fully persistent) ─────────────────────────────────────────────────
-// Synced from /Users/ys/dev/career-ops/TASKS.md — updated by Claude
-const DEFAULT_TASKS = [
-  { text: '投遞 Kraken — Senior PD Onchain Options Trading（4.2/5，強力推薦）', tag: 'hot', done: false },
-  { text: '確認 Pano AI 遠端政策（3.5/5，需確認國際應聘）', tag: 'hot', done: false },
-  { text: '投遞 BitMEX — Crypto Trading PD（4.0/5，Remote Asia OK）', tag: 'work', done: false },
-  { text: '評估 pipeline 職缺 2-3 個（優先：Stripe / Figma / Linear / Deel / Brex）', tag: 'work', done: false },
-  { text: '個人專案：規劃本週要推進的任務', tag: 'art', done: false },
-];
+// ─── SUPABASE ────────────────────────────────────────────────────────────────
+const SUPA_URL = 'https://ijzjwknrhjehskhrvvzr.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlqemp3a25yaGplaHNraHJ2dnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMzY2MjQsImV4cCI6MjA5MzcxMjYyNH0.uCaE_oXUZkLWiZa4-xjLz5Q7Q99mr3D9LTx_TFraY3k';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-// Reset tasks daily (keep user-added ones, reset done status of defaults)
-function getTodayKey() { return 'tasks-' + new Date().toDateString(); }
-let tasks = load(getTodayKey(), null);
-if (!tasks) {
-  tasks = DEFAULT_TASKS.slice();
-  save(getTodayKey(), tasks);
-}
-
-function saveTasks() { save(getTodayKey(), tasks); }
-
-function renderTasks() {
-  const el = document.getElementById('task-list');
-  el.innerHTML = '';
-  tasks.forEach((t, i) => {
-    const div = document.createElement('div');
-    div.className = 'task-item';
-    const tagMap = { hot: 'tag-hot', work: 'tag-work', art: 'tag-work', home: 'tag-home' };
-    const tagLabelMap = { hot: '🔴 急', work: '💼', art: '🎨', home: '🏠' };
-    const tagHTML = t.tag ? `<span class="task-tag ${tagMap[t.tag] || 'tag-work'}">${tagLabelMap[t.tag] || ''}</span>` : '';
-    div.innerHTML = `
-      <div class="cb ${t.done ? 'done' : ''}" onclick="toggleTask(${i})"></div>
-      <div class="task-text ${t.done ? 'done' : ''}">${escHtml(t.text)}${tagHTML}</div>
-      <button class="task-del" onclick="deleteTask(${i})" title="刪除">×</button>
-    `;
-    el.appendChild(div);
-  });
-  const done = tasks.filter(t => t.done).length;
-  document.getElementById('tasks-done-count').textContent = done > 0 ? `${done}/${tasks.length} 完成` : '';
-}
+// ─── TASKS (Supabase 跨裝置同步) ─────────────────────────────────────────────
+let tasks = [];
 
 function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function toggleTask(i) {
-  tasks[i].done = !tasks[i].done;
-  saveTasks();
+async function loadTasks() {
+  const { data, error } = await supa
+    .from('tasks')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) { console.error(error); return; }
+  tasks = data || [];
   renderTasks();
 }
-function deleteTask(i) {
-  tasks.splice(i, 1);
-  saveTasks();
-  renderTasks();
+
+function renderTasks() {
+  const el = document.getElementById('task-list');
+  const activeTasks = tasks.filter(t => !t.done);
+  const doneTasks   = tasks.filter(t => t.done);
+  el.innerHTML = '';
+
+  const tagMap      = { hot: 'tag-hot', work: 'tag-work', art: 'tag-work', home: 'tag-home' };
+  const tagLabelMap = { hot: '🔴 急', work: '💼', art: '🎨', home: '🏠' };
+
+  activeTasks.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'task-item';
+    const tagHTML = t.tag ? `<span class="task-tag ${tagMap[t.tag]||'tag-work'}">${tagLabelMap[t.tag]||''}</span>` : '';
+    div.innerHTML = `
+      <div class="cb" onclick="toggleTask('${t.id}',true)"></div>
+      <div class="task-text">${escHtml(t.text)}${tagHTML}</div>
+      <button class="task-del" onclick="deleteTask('${t.id}')" title="刪除">×</button>`;
+    el.appendChild(div);
+  });
+
+  // 已完成 — 折疊顯示
+  if (doneTasks.length > 0) {
+    const toggle = document.createElement('div');
+    toggle.style.cssText = 'margin-top:10px;cursor:pointer;font-size:11px;color:var(--text-3);user-select:none;';
+    toggle.id = 'done-toggle';
+    toggle.textContent = `▸ 已完成 ${doneTasks.length} 件`;
+    toggle.onclick = () => {
+      const box = document.getElementById('done-tasks-box');
+      const open = box.style.display !== 'none';
+      box.style.display = open ? 'none' : 'block';
+      toggle.textContent = (open ? '▸' : '▾') + ` 已完成 ${doneTasks.length} 件`;
+    };
+    el.appendChild(toggle);
+
+    const box = document.createElement('div');
+    box.id = 'done-tasks-box';
+    box.style.display = 'none';
+    doneTasks.forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'task-item';
+      div.style.opacity = '0.5';
+      div.innerHTML = `
+        <div class="cb done" onclick="toggleTask('${t.id}',false)"></div>
+        <div class="task-text done">${escHtml(t.text)}</div>
+        <button class="task-del" onclick="deleteTask('${t.id}')" title="刪除">×</button>`;
+      box.appendChild(div);
+    });
+    el.appendChild(box);
+  }
+
+  const doneCount = doneTasks.length;
+  const total = tasks.length;
+  document.getElementById('tasks-done-count').textContent = doneCount > 0 ? `${doneCount}/${total} 完成` : '';
 }
-function addTask() {
+
+async function toggleTask(id, done) {
+  const update = done
+    ? { done: true, completed_at: new Date().toISOString() }
+    : { done: false, completed_at: null };
+  await supa.from('tasks').update(update).eq('id', id);
+  await loadTasks();
+}
+
+async function deleteTask(id) {
+  await supa.from('tasks').delete().eq('id', id);
+  await loadTasks();
+}
+
+async function addTask() {
   const input = document.getElementById('new-task');
   const val = input.value.trim();
   if (!val) return;
-  tasks.push({ text: val, tag: '', done: false });
-  saveTasks();
-  renderTasks();
   input.value = '';
+  await supa.from('tasks').insert({ text: val, tag: '', done: false, sort_order: tasks.length });
+  await loadTasks();
 }
-function clearDoneTasks() {
-  tasks = tasks.filter(t => !t.done);
-  saveTasks();
-  renderTasks();
+
+async function clearDoneTasks() {
+  await supa.from('tasks').delete().eq('done', true);
+  await loadTasks();
 }
-function resetDailyTasks() {
-  if (!confirm('重設今日任務？（清除所有完成標記，保留預設清單）')) return;
-  tasks = DEFAULT_TASKS.map(t => ({...t, done: false}));
-  saveTasks();
-  renderTasks();
+
+async function resetDailyTasks() {
+  if (!confirm('清除所有任務並重設預設清單？')) return;
+  await supa.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  const defaults = [
+    { text: '投遞 Kraken — Senior PD Onchain Options Trading', tag: 'hot', done: false, sort_order: 0 },
+    { text: '確認 Pano AI 遠端政策（需確認國際應聘）', tag: 'hot', done: false, sort_order: 1 },
+    { text: '投遞 BitMEX — Crypto Trading PD', tag: 'work', done: false, sort_order: 2 },
+    { text: '評估 pipeline 職缺（Stripe / Figma / Linear）', tag: 'work', done: false, sort_order: 3 },
+    { text: '個人專案：規劃本週要推進的任務', tag: 'art', done: false, sort_order: 4 },
+  ];
+  await supa.from('tasks').insert(defaults);
+  await loadTasks();
 }
-renderTasks();
+
+loadTasks();
 
 // ─── BLOCKERS ────────────────────────────────────────────────────────────────
 const BLOCKERS = [
