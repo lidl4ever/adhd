@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YJ — 今日指揮中心</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #f7f6f3;
+  --bg-panel:  #ffffff;
+  --bg-input:  #f0efec;
+  --bg-btn:    #f0efec;
+  --border:    #e5e3de;
+  --border-2:  #d0cdc6;
+  --text:      #1a1917;
+  --text-2:    #6b6860;
+  --text-3:    #a09e9a;
+  --focus-bg:  #fffdf5;
+  --focus-bdr: #f0e68c;
+  --timer-col: #1a1917;
+  --stat-num:  #1a1917;
+  --tip-bg:    #f7f6f3;
+  --topbar-bg: #ffffff;
+  --accent:    #d4a017;
+  --red:       #ef4444;
+  --green:     #22c55e;
+  --amber:     #f59e0b;
+  --purple:    #6366f1;
+}
+[data-theme="dark"] {
+  --bg:        #0f0f10;
+  --bg-panel:  #18181b;
+  --bg-input:  #111;
+  --bg-btn:    #222;
+  --border:    #2a2a2e;
+  --border-2:  #3a3a3e;
+  --text:      #e8e8e6;
+  --text-2:    #888;
+  --text-3:    #555;
+  --focus-bg:  #18181b;
+  --focus-bdr: #2a2a2e;
+  --timer-col: #ffffff;
+  --stat-num:  #ffffff;
+  --tip-bg:    #111;
+  --topbar-bg: #18181b;
+  --accent:    #f6d860;
+}
+
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.2s, color 0.2s; }
+
+.theme-toggle {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-btn);
+  cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.theme-toggle:hover { border-color: var(--border-2); }
+
+/* Morning gate */
+#morning-gate {
+  position: fixed; inset: 0; background: var(--bg); z-index: 1000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: opacity 0.4s;
+}
+#morning-gate.hidden { opacity: 0; pointer-events: none; }
+.gate-time { font-size: 72px; font-weight: 300; color: var(--text); letter-spacing: -2px; font-variant-numeric: tabular-nums; }
+.gate-date { font-size: 15px; color: var(--text-3); margin-top: 4px; margin-bottom: 48px; }
+.gate-question { font-size: 21px; font-weight: 400; color: var(--text); margin-bottom: 28px; text-align: center; line-height: 1.6; }
+.gate-question span { color: var(--accent); font-weight: 500; }
+.gate-choices { display: flex; flex-direction: column; gap: 10px; width: 380px; }
+.gate-btn {
+  padding: 16px 20px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--bg-panel); color: var(--text); font-size: 14px; cursor: pointer;
+  text-align: left; transition: all 0.15s; display: flex; align-items: center; gap: 14px;
+}
+.gate-btn:hover { border-color: var(--border-2); transform: translateX(4px); background: var(--bg-input); }
+.gate-icon { font-size: 20px; flex-shrink: 0; }
+.gate-label { font-weight: 500; color: var(--text); }
+.gate-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.gate-skip { margin-top: 20px; font-size: 12px; color: var(--text-3); cursor: pointer; }
+.gate-skip:hover { color: var(--text-2); }
+
+/* Main */
+#main { display: none; min-height: 100vh; }
+#main.visible { display: block; }
+
+/* Topbar */
+.topbar {
+  background: var(--topbar-bg); border-bottom: 1px solid var(--border);
+  padding: 11px 24px; display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 100;
+}
+.topbar-time { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-3); }
+.topbar-title { font-size: 13px; color: var(--text-2); }
+.runway { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.runway-label { font-size: 11px; color: var(--text-3); }
+.runway-bar { width: 110px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.runway-fill { height: 100%; background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444); border-radius: 2px; transition: width 0.5s; }
+.runway-days { font-size: 12px; font-weight: 600; color: #f59e0b; }
+.topbar-link {
+  font-size: 12px; color: var(--text-2); text-decoration: none;
+  padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; transition: all 0.15s;
+}
+.topbar-link:hover { border-color: var(--border-2); color: var(--text); }
+
+/* Content */
+.content { padding: 22px 24px; max-width: 1100px; margin: 0 auto; }
+
+/* Focus zone */
+.focus-zone {
+  background: var(--focus-bg); border: 1px solid var(--focus-bdr); border-radius: 16px;
+  padding: 22px 24px; margin-bottom: 18px; position: relative; overflow: hidden;
+}
+.focus-zone::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent), #f59e0b);
+}
+.focus-zone-label { font-size: 11px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+.focus-zone-task input {
+  background: transparent; border: none; outline: none; color: var(--text);
+  font-size: 19px; font-weight: 500; width: 100%; font-family: inherit; margin-bottom: 16px; display: block;
+}
+.focus-zone-task input::placeholder { color: var(--text-3); }
+.timer-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.timer-display { font-size: 42px; font-weight: 300; font-variant-numeric: tabular-nums; color: var(--timer-col); letter-spacing: -1px; min-width: 108px; }
+.timer-display.ticking { color: var(--accent); }
+.t-btn {
+  padding: 9px 18px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-btn); color: var(--text); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s;
+}
+.t-btn:hover { border-color: var(--border-2); }
+.t-btn.primary { background: var(--accent); color: #0f0f10; border-color: var(--accent); }
+.t-btn.primary:hover { opacity: 0.9; }
+.mode-pills { display: flex; gap: 5px; margin-left: 6px; }
+.mode-pill {
+  padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-3); font-size: 11px; cursor: pointer; transition: all 0.15s;
+}
+.mode-pill.active { background: var(--border); color: var(--text); }
+.pom-count { font-size: 12px; color: var(--text-3); margin-left: auto; }
+
+/* Grids */
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.grid-full { margin-bottom: 14px; }
+
+/* Panel */
+.panel { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+.panel-title { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+.panel-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: rgba(239,68,68,0.12); color: #ef4444; font-weight: 600; letter-spacing: 0; text-transform: none; }
+
+/* Stat */
+.stat { text-align: center; }
+.stat-num { font-size: 36px; font-weight: 300; color: var(--stat-num); }
+.stat-label { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+.stat-sub { font-size: 12px; color: #f59e0b; margin-top: 2px; }
+.stat-btn { margin-top: 10px; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-btn); color: var(--text-2); font-size: 11px; cursor: pointer; }
+.stat-btn:hover { border-color: var(--border-2); color: var(--text); }
+
+/* Tasks — with persistence fix */
+.task-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.task-item:last-child { border: none; }
+.cb {
+  width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border-2);
+  flex-shrink: 0; margin-top: 2px; cursor: pointer; transition: all 0.15s; background: transparent;
+  position: relative;
+}
+.cb:hover { border-color: var(--text-3); }
+.cb.done {
+  background: #22c55e; border-color: #22c55e;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 6l3 3 5-5' stroke='%23fff' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: cover;
+}
+.task-text { font-size: 13px; color: var(--text-2); line-height: 1.5; flex: 1; }
+.task-text.done { color: var(--text-3); text-decoration: line-through; }
+.task-del { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 14px; opacity: 0; transition: opacity 0.15s; padding: 0 4px; }
+.task-item:hover .task-del { opacity: 1; }
+.task-tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 10px; margin-left: 6px; font-weight: 500; }
+.tag-hot  { background: rgba(239,68,68,0.12); color: #ef4444; }
+.tag-work { background: rgba(99,102,241,0.12); color: #6366f1; }
+.tag-home { background: rgba(34,197,94,0.12);  color: #16a34a; }
+.add-task { display: flex; gap: 8px; margin-top: 12px; }
+.add-task input { flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; color: var(--text); font-size: 12px; outline: none; font-family: inherit; }
+.add-task input:focus { border-color: var(--border-2); }
+.add-task button { padding: 7px 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-btn); color: var(--text-2); font-size: 12px; cursor: pointer; }
+.add-task button:hover { color: var(--text); border-color: var(--border-2); }
+.task-actions { display: flex; gap: 8px; margin-top: 10px; }
+.task-clear-btn { font-size: 11px; color: var(--text-3); background: none; border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+.task-clear-btn:hover { color: var(--text-2); border-color: var(--border-2); }
+
+/* Blocker panel */
+.blocker-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.blocker-card {
+  border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  background: var(--bg); cursor: pointer; transition: all 0.15s; position: relative;
+}
+.blocker-card:hover { border-color: var(--border-2); }
+.blocker-card.resolved { opacity: 0.4; }
+.blocker-card.resolved .bc-title { text-decoration: line-through; }
+.bc-icon { font-size: 18px; margin-bottom: 6px; }
+.bc-title { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+.bc-sub { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+.bc-status { display: inline-block; margin-top: 6px; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 500; }
+.bc-todo    { background: rgba(239,68,68,0.1); color: #ef4444; }
+.bc-progress{ background: rgba(245,158,11,0.1); color: #d97706; }
+.bc-done    { background: rgba(34,197,94,0.1); color: #16a34a; }
+.blocker-resolve { position: absolute; top: 8px; right: 8px; background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 14px; opacity: 0; transition: opacity 0.15s; }
+.blocker-card:hover .blocker-resolve { opacity: 1; }
+
+/* Tips */
+.tip-card { background: var(--tip-bg); border-radius: 10px; padding: 14px; border: 1px solid var(--border); }
+.tip-name { font-size: 11px; font-weight: 600; color: var(--purple); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.tip-text { font-size: 13px; color: var(--text-2); line-height: 1.6; }
+.tip-nav { display: flex; gap: 6px; margin-top: 12px; }
+.tip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); cursor: pointer; }
+.tip-dot.active { background: var(--purple); }
+
+/* Status */
+.status-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.status-item:last-child { border: none; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot-waiting { background: #f59e0b; animation: pulse 2s infinite; }
+.dot-active  { background: #22c55e; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.status-co   { font-weight: 500; color: var(--text); min-width: 90px; font-size: 13px; }
+.status-role { color: var(--text-3); flex: 1; font-size: 12px; }
+.status-label { font-size: 10px; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+.lbl-waiting { background: rgba(245,158,11,0.12); color: #d97706; }
+.lbl-eval    { background: rgba(34,197,94,0.12);  color: #16a34a; }
+
+/* Big link */
+.big-link {
+  display: flex; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 20px; text-decoration: none; color: var(--text);
+  align-items: center; gap: 14px; transition: all 0.15s; margin-bottom: 14px;
+}
+.big-link:hover { border-color: var(--border-2); background: var(--bg-input); }
+.big-link-icon  { font-size: 22px; }
+.big-link-title { font-size: 14px; font-weight: 500; color: var(--text); }
+.big-link-sub   { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.big-link-arrow { color: var(--text-3); font-size: 16px; margin-left: auto; }
+
+/* Section divider */
+.section-label { font-size: 10px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.12em; margin: 20px 0 10px; display: flex; align-items: center; gap: 10px; }
+.section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* Goals */
+.goal-item { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.goal-item:last-child { border: none; }
+.goal-rank { font-size: 18px; flex-shrink: 0; }
+.goal-text { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; }
+.goal-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.goal-tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 500; white-space: nowrap; }
+.goal-urgent { background: rgba(239,68,68,0.1); color: #ef4444; }
+.goal-long   { background: rgba(99,102,241,0.1); color: #6366f1; }
+
+/* Sleep tracker */
+.sleep-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.sleep-row:last-child { border: none; }
+.sleep-icon { font-size: 16px; }
+.sleep-label { font-size: 12px; color: var(--text); flex: 1; }
+.sleep-action { font-size: 11px; color: var(--accent); cursor: pointer; background: none; border: none; font-family: inherit; }
+.sleep-action:hover { text-decoration: underline; }
+.sleep-status { font-size: 10px; padding: 2px 7px; border-radius: 10px; }
+.sleep-ok { background: rgba(34,197,94,0.1); color: #16a34a; }
+.sleep-warn { background: rgba(239,68,68,0.1); color: #ef4444; }
+</style>
+</head>
+<body>
+
+<!-- Morning gate -->
+<div id="morning-gate">
+  <div class="gate-time" id="gate-clock">--:--</div>
+  <div class="gate-date" id="gate-date"></div>
+  <div class="gate-question">早安，YJ。<br>今天，你的大腦可以做<span> 哪一件事</span>？</div>
+  <div class="gate-choices">
+    <button class="gate-btn" onclick="startDay('job')">
+      <span class="gate-icon">💼</span>
+      <div><div class="gate-label">找工作 — 今天衝申請</div><div class="gate-sub">投遞、評估職缺、寫 cover letter</div></div>
+    </button>
+    <button class="gate-btn" onclick="startDay('art')">
+      <span class="gate-icon">🎨</span>
+      <div><div class="gate-label">藝術工作 — 進工作室</div><div class="gate-sub">創作、portfolio、展覽規劃</div></div>
+    </button>
+    <button class="gate-btn" onclick="startDay('admin')">
+      <span class="gate-icon">⚙️</span>
+      <div><div class="gate-label">雜事清空 — 處理待辦</div><div class="gate-sub">家務批次、設定、腦袋噪音</div></div>
+    </button>
+    <button class="gate-btn" onclick="startDay('rest')">
+      <span class="gate-icon">🌿</span>
+      <div><div class="gate-label">今天狀態不好 — 小步前進</div><div class="gate-sub">只做一件最小的事就算贏</div></div>
+    </button>
+    <button class="gate-btn" onclick="startDay('unblock')">
+      <span class="gate-icon">🧠</span>
+      <div><div class="gate-label">腦袋清空模式</div><div class="gate-sub">倒出所有事 → 分類 → 選一件現在做</div></div>
+    </button>
+  </div>
+  <div class="gate-skip" onclick="skipGate()">直接進入儀表板 →</div>
+</div>
+
+<!-- Main -->
+<div id="main">
+
+  <div class="topbar">
+    <div class="topbar-time" id="topbar-time">--:--</div>
+    <div class="topbar-title">YJ 指揮中心</div>
+    <div class="runway">
+      <div class="runway-label">生活費跑道</div>
+      <div class="runway-bar"><div class="runway-fill" id="runway-fill" style="width:100%"></div></div>
+      <div class="runway-days" id="runway-days">計算中...</div>
+    </div>
+    <button class="topbar-link" onclick="showGate()" style="cursor:pointer;background:none;">切換模式</button>
+    <a class="topbar-link" href="/Users/ys/dev/career-ops/kanban.html">Kanban →</a>
+    <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()">☀️</button>
+  </div>
+
+  <div class="content">
+
+    <!-- Focus zone -->
+    <div class="focus-zone">
+      <div class="focus-zone-label" id="focus-context">現在只做這一件事</div>
+      <div class="focus-zone-task">
+        <input id="focus-input" placeholder="輸入今天要專注的任務..." maxlength="100" oninput="saveFocusTask()">
+      </div>
+      <div class="timer-row">
+        <div class="timer-display" id="timer-display">25:00</div>
+        <div style="display:flex;gap:8px;">
+          <button class="t-btn primary" id="start-btn" onclick="toggleTimer()">開始</button>
+          <button class="t-btn" onclick="resetTimer()">重設</button>
+        </div>
+        <div class="mode-pills">
+          <button class="mode-pill active" onclick="setMode(25,'work',this)">25</button>
+          <button class="mode-pill" onclick="setMode(5,'short',this)">5</button>
+          <button class="mode-pill" onclick="setMode(15,'long',this)">15</button>
+        </div>
+        <div class="pom-count" id="pom-count">今日 0 🍅</div>
+      </div>
+    </div>
+
+    <!-- ADHD Unblock 入口 — 第一層，Focus Zone 正下方 -->
+    <button onclick="openUnblock()" style="
+      width:100%; padding:13px 20px; border-radius:12px; margin-bottom:14px;
+      border:1px solid var(--border); background:var(--bg-panel);
+      color:var(--text); font-size:13px; cursor:pointer; text-align:left;
+      display:flex; align-items:center; gap:12px; transition:all 0.15s;
+      font-family:inherit;
+    " onmouseover="this.style.borderColor='var(--border-2)';this.style.background='var(--bg-input)'"
+       onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg-panel)'">
+      <span style="font-size:18px;">🧠</span>
+      <div>
+        <span style="font-weight:500;color:var(--text);">腦袋清空模式</span>
+        <span style="font-size:11px;color:var(--text-3);margin-left:10px;">倒出所有事 → 分類 → 選一件現在做</span>
+      </div>
+      <span style="margin-left:auto;color:var(--text-3);font-size:13px;">→</span>
+    </button>
+
+    <!-- Stats -->
+    <div class="grid-3">
+      <div class="panel stat">
+        <div class="panel-title">投遞申請</div>
+        <div class="stat-num" id="stat-applied">0</div>
+        <div class="stat-label">份（目標 20）</div>
+        <div class="stat-sub" id="stat-applied-sub">今天還沒投</div>
+        <button class="stat-btn" onclick="addStat('applied')">+ 投遞一份</button>
+      </div>
+      <div class="panel stat">
+        <div class="panel-title">評估職缺</div>
+        <div class="stat-num" id="stat-eval">0</div>
+        <div class="stat-label">個（目標 30）</div>
+        <div class="stat-sub">用 /career-ops 評估</div>
+        <button class="stat-btn" onclick="addStat('eval')">+ 評估一個</button>
+      </div>
+      <div class="panel stat">
+        <div class="panel-title">活躍申請中</div>
+        <div class="stat-num" id="stat-waiting">2</div>
+        <div class="stat-label">等待回覆</div>
+        <div class="stat-sub">Mistral AI · Perk</div>
+        <button class="stat-btn" onclick="addStat('waiting')">+ 更新</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- 今日任務（已修復儲存 bug） -->
+      <div class="panel">
+        <div class="panel-title">
+          今日任務 — 選一件開始
+          <span id="tasks-done-count" style="font-size:11px;color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0;"></span>
+        </div>
+        <div id="task-list"></div>
+        <div class="add-task">
+          <input id="new-task" placeholder="加入今日任務..." onkeydown="if(event.key==='Enter')addTask()">
+          <button onclick="addTask()">+</button>
+        </div>
+        <div class="task-actions">
+          <button class="task-clear-btn" onclick="clearDoneTasks()">清除已完成</button>
+          <button class="task-clear-btn" onclick="resetDailyTasks()">重設今日任務</button>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="panel">
+          <div class="panel-title">申請追蹤</div>
+          <div class="status-item">
+            <div class="status-dot dot-waiting"></div>
+            <div class="status-co">Mistral AI</div>
+            <div class="status-role">Product Designer · Paris/London</div>
+            <span class="status-label lbl-waiting">等待中 · 已投 2026-04-22</span>
+          </div>
+          <div class="status-item">
+            <div class="status-dot dot-waiting"></div>
+            <div class="status-co">Perk</div>
+            <div class="status-role">Senior PD · London/Barcelona</div>
+            <span class="status-label lbl-waiting">等待決定 · 2026-04-22</span>
+          </div>
+          <div class="status-item">
+            <div class="status-dot dot-active"></div>
+            <div class="status-co">Kraken</div>
+            <div class="status-role">Senior PD Onchain · 4.2/5</div>
+            <span class="status-label lbl-eval">🔴 優先申請</span>
+          </div>
+          <div class="status-item">
+            <div class="status-dot dot-active"></div>
+            <div class="status-co">BitMEX</div>
+            <div class="status-role">Crypto Trading PD · 4.0/5</div>
+            <span class="status-label lbl-eval">待申請</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">ADHD 今日策略</div>
+          <div class="tip-card" id="tip-card">
+            <div class="tip-name" id="tip-name"></div>
+            <div class="tip-text" id="tip-text"></div>
+          </div>
+          <div class="tip-nav" id="tip-nav"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 長期目標 -->
+    <div class="section-label">大目標</div>
+    <div class="grid">
+      <div class="panel">
+        <div class="panel-title">重要目標</div>
+        <div class="goal-item">
+          <div class="goal-rank">🔴</div>
+          <div style="flex:1">
+            <div class="goal-text">找到帶 relocation 的歐洲工作</div>
+            <div class="goal-sub">生活費跑道剩約 65 天 · 第一優先</div>
+          </div>
+          <span class="goal-tag goal-urgent">緊急</span>
+        </div>
+        <div class="goal-item">
+          <div class="goal-rank">🟣</div>
+          <div style="flex:1">
+            <div class="goal-text">藝術獎項 + 重要展覽</div>
+            <div class="goal-sub">工作室創作、portfolio、展覽規劃</div>
+          </div>
+          <span class="goal-tag goal-long">長期</span>
+        </div>
+      </div>
+
+      <!-- 睡眠與健康 -->
+      <div class="panel">
+        <div class="panel-title">
+          障礙清單
+          <span class="panel-badge" id="blocker-count">載入中...</span>
+        </div>
+        <div class="sleep-row">
+          <div class="sleep-icon">😴</div>
+          <div class="sleep-label">睡眠呼吸中止症 — 影響每日能量</div>
+          <button class="sleep-action" onclick="openBlockerDetail('sleep')">處理 →</button>
+          <span class="sleep-status sleep-warn" id="sleep-status">待處理</span>
+        </div>
+        <div class="sleep-row">
+          <div class="sleep-icon">💡</div>
+          <div class="sleep-label">智慧燈泡配對 + 自動化設定</div>
+          <button class="sleep-action" onclick="openBlockerDetail('lights')">處理 →</button>
+          <span class="sleep-status sleep-warn" id="lights-status">待處理</span>
+        </div>
+        <div class="sleep-row">
+          <div class="sleep-icon">🧹</div>
+          <div class="sleep-label">廚房/客廳雜物 + 置物架</div>
+          <button class="sleep-action" onclick="openBlockerDetail('clutter')">處理 →</button>
+          <span class="sleep-status sleep-warn" id="clutter-status">待處理</span>
+        </div>
+        <div class="sleep-row">
+          <div class="sleep-icon">🧥</div>
+          <div class="sleep-label">冬衣真空包收納</div>
+          <button class="sleep-action" onclick="openBlockerDetail('clothes')">處理 →</button>
+          <span class="sleep-status sleep-warn" id="clothes-status">待處理</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 障礙詳細模組 -->
+    <div class="section-label">障礙掃除計畫</div>
+    <div class="blocker-grid" id="blocker-grid">
+      <!-- 動態生成 -->
+    </div>
+
+    <a class="big-link" href="/Users/ys/dev/career-ops/kanban.html">
+      <div class="big-link-icon">📋</div>
+      <div>
+        <div class="big-link-title">Job Search Kanban</div>
+        <div class="big-link-sub">50+ 職缺 · Pipeline → Evaluated → Applied → Interview</div>
+      </div>
+      <div class="big-link-arrow">→</div>
+    </a>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     ADHD UNBLOCK 全螢幕疊層
+════════════════════════════════════════════════════════════ -->
+<div id="unblock-overlay" style="
+  display:none; position:fixed; inset:0; z-index:2000;
+  background:#f7f6f3; color:#1a1917;
+  font-family:'DM Mono','Courier New',monospace;
+  overflow-y:auto;
+">
+  <!-- 關閉按鈕 -->
+  <button onclick="closeUnblock()" style="
+    position:fixed; top:20px; right:24px; z-index:10;
+    background:transparent; border:1px solid #e5e3de;
+    color:#6b6860; font-size:12px; padding:7px 14px;
+    border-radius:6px; cursor:pointer; font-family:'DM Mono',monospace;
+    transition:all 0.15s;
+  " onmouseover="this.style.borderColor='#d0cdc6';this.style.color='#1a1917'"
+     onmouseout="this.style.borderColor='#e5e3de';this.style.color='#6b6860'">
+    ✕ 關閉
+  </button>
+
+  <div id="unblock-app" style="
+    min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:flex-start;
+    padding:48px 24px;
+  "></div>
+</div>
+
+<script>
+// ─── STORAGE HELPERS ────────────────────────────────────────────────────────
+function load(key, def) {
+  try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : def; }
+  catch(e) { return def; }
+}
+function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+// ─── THEME ──────────────────────────────────────────────────────────────────
+const ICONS = { light: '☀️', dark: '🌙' };
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('theme-btn').textContent = t === 'light' ? ICONS.dark : ICONS.light;
+  save('yj-theme', t);
+}
+function toggleTheme() {
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+}
+applyTheme(load('yj-theme', 'light'));
+
+// ─── CLOCK ──────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const hm = now.toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit', hour12:false});
+  document.getElementById('gate-clock').textContent = hm;
+  document.getElementById('topbar-time').textContent = hm;
+  document.getElementById('gate-date').textContent =
+    now.toLocaleDateString('zh-TW', {month:'long', day:'numeric', weekday:'long'});
+}
+updateClock();
+setInterval(updateClock, 10000);
+
+// ─── RUNWAY ─────────────────────────────────────────────────────────────────
+(function() {
+  const saved = localStorage.getItem('runway-start');
+  const start = saved ? new Date(saved) : new Date();
+  if (!saved) localStorage.setItem('runway-start', start.toISOString());
+  const totalDays = 65;
+  const remaining = Math.max(0, totalDays - Math.floor((new Date() - start) / 86400000));
+  document.getElementById('runway-fill').style.width = (remaining / totalDays * 100) + '%';
+  document.getElementById('runway-days').textContent = remaining + ' 天';
+})();
+
+// ─── MORNING GATE ────────────────────────────────────────────────────────────
+const FOCUS_LABELS = {
+  job:   '💼 今日模式：找工作 — 投遞申請 / 評估職缺',
+  art:   '🎨 今日模式：藝術工作 — 進入創作狀態',
+  admin: '⚙️ 今日模式：清空雜事 — 完成後大腦才能專注',
+  rest:  '🌿 今日模式：低能量 — 只做一件最小的事'
+};
+const FOCUS_TASKS = {
+  job:   '評估今天最優先的一個職缺',
+  art:   '打開工作室，先做 15 分鐘不需要思考的事',
+  admin: '把所有腦袋裡的噪音列出來，然後選一件現在做',
+  rest:  '打開 Kanban，只看一張卡片。看完算完成。'
+};
+function startDay(mode) {
+  if (mode === 'unblock') {
+    showMain();
+    openUnblock();
+    return;
+  }
+  document.getElementById('focus-context').textContent = FOCUS_LABELS[mode];
+  document.getElementById('focus-input').value = FOCUS_TASKS[mode];
+  save('today-mode', mode);
+  save('focus-task', FOCUS_TASKS[mode]);
+  showMain();
+}
+function skipGate() { showMain(); }
+function showMain() {
+  document.getElementById('morning-gate').classList.add('hidden');
+  document.getElementById('main').classList.add('visible');
+}
+function showGate() {
+  document.getElementById('morning-gate').classList.remove('hidden');
+  window.scrollTo(0, 0);
+}
+(function() {
+  const last = localStorage.getItem('gate-date');
+  const today = new Date().toDateString();
+  if (last === today) { showMain(); }
+  else { localStorage.setItem('gate-date', today); }
+  const mode = load('today-mode', null);
+  if (mode && FOCUS_LABELS[mode]) {
+    document.getElementById('focus-context').textContent = FOCUS_LABELS[mode];
+  }
+  const ft = load('focus-task', null);
+  if (ft) document.getElementById('focus-input').value = ft;
+})();
+function saveFocusTask() {
+  save('focus-task', document.getElementById('focus-input').value);
+}
+
+// ─── POMODORO ────────────────────────────────────────────────────────────────
+let timerMin = 25, timerMode = 'work', timeLeft = 25*60, running = false, interval = null;
+let pomCount = load('pom-count-' + new Date().toDateString(), 0);
+document.getElementById('pom-count').textContent = '今日 ' + pomCount + ' 🍅';
+
+function setMode(min, mode, btn) {
+  timerMin = min; timerMode = mode; timeLeft = min*60; running = false;
+  clearInterval(interval);
+  document.getElementById('start-btn').textContent = '開始';
+  document.getElementById('timer-display').classList.remove('ticking');
+  updateTimerDisplay();
+  document.querySelectorAll('.mode-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function toggleTimer() {
+  if (running) {
+    clearInterval(interval); running = false;
+    document.getElementById('start-btn').textContent = '繼續';
+    document.getElementById('timer-display').classList.remove('ticking');
+  } else {
+    running = true;
+    document.getElementById('start-btn').textContent = '暫停';
+    document.getElementById('timer-display').classList.add('ticking');
+    interval = setInterval(() => {
+      timeLeft--;
+      if (timeLeft <= 0) {
+        clearInterval(interval); running = false;
+        document.getElementById('timer-display').classList.remove('ticking');
+        document.getElementById('start-btn').textContent = '開始';
+        if (timerMode === 'work') {
+          pomCount++;
+          save('pom-count-' + new Date().toDateString(), pomCount);
+          document.getElementById('pom-count').textContent = '今日 ' + pomCount + ' 🍅';
+        }
+        timeLeft = timerMin * 60;
+        updateTimerDisplay();
+        alert(timerMode === 'work' ? '🍅 完成！休息一下' : '⏰ 休息結束，繼續！');
+      }
+      updateTimerDisplay();
+    }, 1000);
+  }
+}
+function resetTimer() {
+  clearInterval(interval); running = false; timeLeft = timerMin*60;
+  document.getElementById('start-btn').textContent = '開始';
+  document.getElementById('timer-display').classList.remove('ticking');
+  updateTimerDisplay();
+}
+function updateTimerDisplay() {
+  const m = Math.floor(timeLeft/60), s = timeLeft%60;
+  document.getElementById('timer-display').textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+// ─── STATS ───────────────────────────────────────────────────────────────────
+let stats = load('yj-stats', {applied:0, eval:0, waiting:2});
+function renderStats() {
+  document.getElementById('stat-applied').textContent = stats.applied;
+  document.getElementById('stat-eval').textContent = stats.eval;
+  document.getElementById('stat-waiting').textContent = stats.waiting;
+  if (stats.applied > 0) document.getElementById('stat-applied-sub').textContent = '累計投遞 ' + stats.applied + ' 份';
+  save('yj-stats', stats);
+}
+function addStat(key) {
+  if (key === 'waiting') {
+    const v = prompt('等待回覆數量：', stats.waiting);
+    if (v !== null) stats.waiting = parseInt(v) || 0;
+  } else { stats[key]++; }
+  renderStats();
+}
+renderStats();
+
+// ─── TASKS (fully persistent) ─────────────────────────────────────────────────
+// Synced from /Users/ys/dev/career-ops/TASKS.md — updated by Claude
+const DEFAULT_TASKS = [
+  { text: '投遞 Kraken — Senior PD Onchain Options Trading（4.2/5，強力推薦）', tag: 'hot', done: false },
+  { text: '確認 Pano AI 遠端政策（3.5/5，需確認國際應聘）', tag: 'hot', done: false },
+  { text: '投遞 BitMEX — Crypto Trading PD（4.0/5，Remote Asia OK）', tag: 'work', done: false },
+  { text: '評估 pipeline 職缺 2-3 個（優先：Stripe / Figma / Linear / Deel / Brex）', tag: 'work', done: false },
+  { text: '個人專案：規劃本週要推進的任務', tag: 'art', done: false },
+];
+
+// Reset tasks daily (keep user-added ones, reset done status of defaults)
+function getTodayKey() { return 'tasks-' + new Date().toDateString(); }
+let tasks = load(getTodayKey(), null);
+if (!tasks) {
+  tasks = DEFAULT_TASKS.slice();
+  save(getTodayKey(), tasks);
+}
+
+function saveTasks() { save(getTodayKey(), tasks); }
+
+function renderTasks() {
+  const el = document.getElementById('task-list');
+  el.innerHTML = '';
+  tasks.forEach((t, i) => {
+    const div = document.createElement('div');
+    div.className = 'task-item';
+    const tagMap = { hot: 'tag-hot', work: 'tag-work', art: 'tag-work', home: 'tag-home' };
+    const tagLabelMap = { hot: '🔴 急', work: '💼', art: '🎨', home: '🏠' };
+    const tagHTML = t.tag ? `<span class="task-tag ${tagMap[t.tag] || 'tag-work'}">${tagLabelMap[t.tag] || ''}</span>` : '';
+    div.innerHTML = `
+      <div class="cb ${t.done ? 'done' : ''}" onclick="toggleTask(${i})"></div>
+      <div class="task-text ${t.done ? 'done' : ''}">${escHtml(t.text)}${tagHTML}</div>
+      <button class="task-del" onclick="deleteTask(${i})" title="刪除">×</button>
+    `;
+    el.appendChild(div);
+  });
+  const done = tasks.filter(t => t.done).length;
+  document.getElementById('tasks-done-count').textContent = done > 0 ? `${done}/${tasks.length} 完成` : '';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleTask(i) {
+  tasks[i].done = !tasks[i].done;
+  saveTasks();
+  renderTasks();
+}
+function deleteTask(i) {
+  tasks.splice(i, 1);
+  saveTasks();
+  renderTasks();
+}
+function addTask() {
+  const input = document.getElementById('new-task');
+  const val = input.value.trim();
+  if (!val) return;
+  tasks.push({ text: val, tag: '', done: false });
+  saveTasks();
+  renderTasks();
+  input.value = '';
+}
+function clearDoneTasks() {
+  tasks = tasks.filter(t => !t.done);
+  saveTasks();
+  renderTasks();
+}
+function resetDailyTasks() {
+  if (!confirm('重設今日任務？（清除所有完成標記，保留預設清單）')) return;
+  tasks = DEFAULT_TASKS.map(t => ({...t, done: false}));
+  saveTasks();
+  renderTasks();
+}
+renderTasks();
+
+// ─── BLOCKERS ────────────────────────────────────────────────────────────────
+const BLOCKERS = [
+  {
+    id: 'sleep', icon: '😴',
+    title: '睡眠呼吸中止症',
+    sub: '直接影響每日注意力與能量',
+    steps: ['預約耳鼻喉科 / 睡眠門診', '詢問 CPAP 機器', '暫時：側睡 + 抬高枕頭'],
+    status: 'todo'
+  },
+  {
+    id: 'lights', icon: '💡',
+    title: '智慧燈泡 + 自動化',
+    sub: '腦袋雜訊：一直想著沒做完',
+    steps: ['30 分鐘批次：全部燈泡重置配對', '設定睡眠/起床自動化', '做完就別再想'],
+    status: 'todo'
+  },
+  {
+    id: 'clutter', icon: '🧹',
+    title: '廚房/客廳雜物',
+    sub: '視覺雜亂 = 注意力消耗',
+    steps: ['買一個置物架（網路訂購 10 分鐘）', '設定 1 小時清潔批次', '雜物：留/丟/捐 三箱法'],
+    status: 'todo'
+  },
+  {
+    id: 'clothes', icon: '🧥',
+    title: '冬衣收納',
+    sub: '衣物堆放造成焦慮',
+    steps: ['訂購真空收納袋（Amazon/蝦皮）', '一次處理完，不分批', '貼標籤標記內容物'],
+    status: 'todo'
+  },
+  {
+    id: 'wardrobe', icon: '🚪',
+    title: '衣櫥空間不足',
+    sub: '需要額外置物方案',
+    steps: ['量測空間', '選購：掛衣架 or 收納抽屜', '利用門背掛鉤'],
+    status: 'todo'
+  },
+  {
+    id: 'focus', icon: '🧠',
+    title: 'ADHD 每日啟動困難',
+    sub: '起床後難以進入狀態',
+    steps: ['起床後不碰手機 15 分鐘', '用晨間儀式取代意志力', '選好昨晚的第一件事'],
+    status: 'todo'
+  },
+];
+
+let blockerState = load('yj-blockers', {});
+
+function renderBlockers() {
+  const grid = document.getElementById('blocker-grid');
+  grid.innerHTML = '';
+  let pendingCount = 0;
+  BLOCKERS.forEach(b => {
+    const state = blockerState[b.id] || b.status;
+    if (state !== 'done') pendingCount++;
+    const card = document.createElement('div');
+    card.className = 'blocker-card' + (state === 'done' ? ' resolved' : '');
+    card.id = 'blocker-' + b.id;
+    const stepsHTML = b.steps.map(s => `<div style="font-size:11px;color:var(--text-3);margin-top:3px;">▸ ${s}</div>`).join('');
+    const statusLabel = state === 'done' ? '✓ 完成' : state === 'progress' ? '進行中' : '待處理';
+    const statusClass = state === 'done' ? 'bc-done' : state === 'progress' ? 'bc-progress' : 'bc-todo';
+    card.innerHTML = `
+      <button class="blocker-resolve" onclick="cycleBlocker('${b.id}')" title="更新狀態">→</button>
+      <div class="bc-icon">${b.icon}</div>
+      <div class="bc-title">${b.title}</div>
+      <div class="bc-sub">${b.sub}</div>
+      ${stepsHTML}
+      <span class="bc-status ${statusClass}">${statusLabel}</span>
+    `;
+    grid.appendChild(card);
+
+    // Update sidebar status indicators
+    const el = document.getElementById(b.id + '-status');
+    if (el) {
+      el.textContent = statusLabel;
+      el.className = 'sleep-status ' + (state === 'done' ? 'sleep-ok' : 'sleep-warn');
+    }
+  });
+  document.getElementById('blocker-count').textContent = pendingCount + ' 待處理';
+}
+
+function cycleBlocker(id) {
+  const cur = blockerState[id] || 'todo';
+  const next = { todo: 'progress', progress: 'done', done: 'todo' };
+  blockerState[id] = next[cur];
+  save('yj-blockers', blockerState);
+  renderBlockers();
+}
+
+function openBlockerDetail(id) {
+  const card = document.getElementById('blocker-' + id);
+  if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); card.style.outline = '2px solid var(--accent)'; setTimeout(() => card.style.outline = '', 1500); }
+}
+
+renderBlockers();
+
+// ─── ADHD TIPS ────────────────────────────────────────────────────────────────
+const TIPS = [
+  { name:'今天只需要一個勝利', text:'完成一件與求職相關的事就算贏了今天。投遞一份申請、評估一個職缺、聯繫一個人。不需要完美，需要的是動起來。' },
+  { name:'兩分鐘法則', text:'如果一件事兩分鐘以內可以完成，現在就做。不要讓它繼續佔用你的大腦。確認 email、更新一行 CV、回一則訊息。' },
+  { name:'腦袋噪音清空法', text:'家務焦慮是注意力殺手。把所有掛念的事寫在紙上，告訴自己：已記錄，不需要用大腦存放了。' },
+  { name:'能量管理，不是時間管理', text:'ADHD 不是懶，是能量分配的問題。注意力來的時候全力衝最重要的事，能量低的時候做不需要思考的瑣事。' },
+  { name:'一次一個分頁', text:'打開 Kanban，只看一張卡片。點進去，只做那一件事。其他的職缺等你做完再說。' },
+  { name:'番茄鐘的真正用法', text:'不是為了計時，是為了給自己一個許可：25 分鐘後可以停。知道有終點，更容易開始。' },
+  { name:'跟進是你的優勢', text:'Mistral 投了 6 天了。大部分人不會跟進。你跟進，就比 80% 的申請者更有印象。' },
+  { name:'睡眠是 ADHD 的隱藏 buff', text:'睡眠呼吸中止症會讓 ADHD 症狀加重兩倍。預約睡眠門診這件事，一旦做好，每天都會有回報。' },
+  { name:'障礙不是藉口，是待處理的 bug', text:'燈泡沒配對、衣服沒整理——這些不是你懶，是真實的認知負擔。清掉它們，大腦才有空間做真正重要的事。' },
+];
+let tipIdx = load('tip-idx', 0) % TIPS.length;
+function renderTip() {
+  document.getElementById('tip-name').textContent = TIPS[tipIdx].name;
+  document.getElementById('tip-text').textContent = TIPS[tipIdx].text;
+  document.getElementById('tip-nav').innerHTML = TIPS.map((_,i) =>
+    `<div class="tip-dot ${i===tipIdx?'active':''}" onclick="setTip(${i})"></div>`).join('');
+  save('tip-idx', tipIdx);
+}
+function setTip(i) { tipIdx = i; renderTip(); }
+setInterval(() => { tipIdx = (tipIdx+1) % TIPS.length; renderTip(); }, 30000);
+renderTip();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ADHD UNBLOCK ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+const UB = {
+  phase: 'dump',      // dump | triage | focus
+  tasks: [],
+  triageIdx: 0,
+  focusTask: null,
+  timerSec: 300,
+  timerRunning: false,
+  timerDone: false,
+  _interval: null,
+};
+
+const EFFORT_LABELS = ['很簡單', '有點難', '很難'];
+const IMPACT_LABELS = ['沒什麼用', '有些用', '很有用'];
+const STATUS_META = {
+  blocker:    { label: '解鎖任務', color: '#FF6B35', bg: 'rgba(255,107,53,0.12)' },
+  'quick-win':{ label: '立即可做', color: '#2DD4A7', bg: 'rgba(45,212,167,0.12)' },
+  defer:      { label: '延後處理', color: '#A78BFA', bg: 'rgba(167,139,250,0.12)' },
+  noise:      { label: '低優先',   color: '#6B7280', bg: 'rgba(107,114,128,0.08)' },
+  waiting:    { label: '等待中',   color: '#FBBF24', bg: 'rgba(251,191,36,0.12)' },
+};
+
+function ubClassify(impact, effort, isBlocker) {
+  if (isBlocker) return 'blocker';
+  if (impact === 2 && effort <= 1) return 'quick-win';
+  if (impact === 2 && effort === 2) return 'defer';
+  if (impact <= 1) return 'noise';
+  return 'quick-win';
+}
+
+function openUnblock() {
+  document.getElementById('unblock-overlay').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  ubRender();
+}
+function closeUnblock() {
+  document.getElementById('unblock-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+  clearInterval(UB._interval);
+  UB.timerRunning = false;
+}
+
+function ubSave() { save('ub-tasks', UB.tasks); }
+function ubLoad() { UB.tasks = load('ub-tasks', []); }
+
+// ── Render dispatcher ──
+function ubRender() {
+  ubLoad();
+  const app = document.getElementById('unblock-app');
+  if (UB.phase === 'dump')   { app.innerHTML = ubDumpHTML(); ubBindDump(); }
+  if (UB.phase === 'triage') { app.innerHTML = ubTriageHTML(); ubBindTriage(); }
+  if (UB.phase === 'focus')  { app.innerHTML = ubFocusHTML(); ubBindFocus(); }
+}
+
+// ── Shared styles injected once ──
+(function injectUBStyles() {
+  if (document.getElementById('ub-styles')) return;
+  const s = document.createElement('style');
+  s.id = 'ub-styles';
+  s.textContent = `
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;600&display=swap');
+    #unblock-app ::placeholder { color: #b0aea8; }
+    .ub-btn-primary {
+      background:#1a1917; color:#f7f6f3; border:none; padding:12px 28px;
+      border-radius:6px; font-family:'DM Mono',monospace; font-size:13px;
+      font-weight:500; cursor:pointer; transition:all 0.15s; letter-spacing:0.04em;
+      width:100%;
+    }
+    .ub-btn-primary:hover { background:#333; transform:translateY(-1px); }
+    .ub-btn-primary:disabled { opacity:0.3; cursor:not-allowed; transform:none; }
+    .ub-btn-ghost {
+      background:transparent; color:#6b6860; border:1px solid #e5e3de;
+      padding:10px 20px; border-radius:6px; font-family:'DM Mono',monospace;
+      font-size:12px; cursor:pointer; transition:all 0.15s; width:100%;
+    }
+    .ub-btn-ghost:hover { border-color:#d0cdc6; color:#1a1917; }
+    .ub-task-pill {
+      display:flex; align-items:center; gap:8px; padding:10px 14px;
+      background:#f0efec; border-radius:6px; border:1px solid #e5e3de;
+      font-size:13px; color:#1a1917;
+    }
+    .ub-choice {
+      flex:1; padding:14px 8px; border-radius:8px; border:1px solid #e5e3de;
+      background:#f0efec; color:#6b6860; font-family:'DM Mono',monospace;
+      font-size:12px; cursor:pointer; transition:all 0.15s; text-align:center;
+    }
+    .ub-choice:hover { border-color:#d0cdc6; color:#1a1917; background:#e8e6e1; }
+    .ub-choice.sel-green { border-color:#2DD4A7; color:#0d9e7a; background:rgba(45,212,167,0.1); }
+    .ub-choice.sel-warm  { border-color:#FF6B35; color:#d4500f; background:rgba(255,107,53,0.1); }
+    .ub-tag { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:500; }
+    .ub-header-line { height:1px; background:linear-gradient(90deg,#e5e3de 0%,transparent 100%); margin-bottom:40px; }
+    .ub-blocker-btn { width:100%; padding:11px; border-radius:8px; margin-bottom:20px; font-family:'DM Mono',monospace; font-size:12px; cursor:pointer; transition:all 0.15s; }
+    .ub-timer-ring { transition:stroke-dashoffset 1s linear; }
+  `;
+  document.head.appendChild(s);
+})();
+
+// ─── PHASE: DUMP ──────────────────────────────────────────────────────────────
+function ubDumpHTML() {
+  const taskRows = UB.tasks.map((t,i) => {
+    const meta = t.status ? STATUS_META[t.status] : null;
+    const tag = meta ? `<span class="ub-tag" style="background:${meta.bg};color:${meta.color}">${meta.label}</span>` : '';
+    return `<div class="ub-task-pill">
+      <span style="flex:1">${escHtml(t.text)}</span>${tag}
+      <button onclick="ubRemoveTask(${i})" style="background:none;border:none;color:#3D3B4D;cursor:pointer;font-size:16px;padding:0 4px">×</button>
+    </div>`;
+  }).join('');
+
+  const unclassified = UB.tasks.filter(t => t.status === null).length;
+  const actionBtn = UB.tasks.length === 0 ? '' :
+    unclassified > 0
+      ? `<button class="ub-btn-primary" id="ub-triage-btn">開始分類 (${unclassified} 件) →</button>`
+      : `<button class="ub-btn-primary" id="ub-triage-btn">選出今天的任務 →</button>`;
+
+  return `
+    <div style="width:100%;max-width:520px">
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
+        <span style="font-size:11px;color:#a09e9a;letter-spacing:0.12em;text-transform:uppercase">ADHD UNBLOCK</span>
+        ${UB.tasks.length > 0 ? `<span style="font-size:11px;color:#a09e9a">${UB.tasks.length} 件事</span>` : ''}
+      </div>
+      <div class="ub-header-line"></div>
+      <p style="font-size:13px;color:#6b6860;margin-bottom:20px;line-height:1.7">
+        把腦袋裡所有還沒做的事倒出來。<br>不用整理，不用排序，一行一件事。
+      </p>
+      <textarea id="ub-input" placeholder="買廚房層架&#10;收沙發上的衣服&#10;智慧燈泡還沒配對好..." style="
+        width:100%;min-height:140px;background:#f0efec;border:1px solid #e5e3de;
+        border-radius:8px;padding:16px;color:#1a1917;font-family:'DM Mono',monospace;
+        font-size:13px;resize:vertical;outline:none;line-height:1.8;
+      "></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;margin-bottom:${UB.tasks.length > 0 ? '16px' : '0'}">
+        <button class="ub-btn-primary" id="ub-add-btn">加入清單</button>
+      </div>
+      ${UB.tasks.length > 0 ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">${taskRows}</div>` : ''}
+      ${actionBtn}
+    </div>`;
+}
+function ubBindDump() {
+  document.getElementById('ub-add-btn').onclick = ubAddTasks;
+  document.getElementById('ub-input').onkeydown = e => { if (e.key === 'Enter' && e.metaKey) ubAddTasks(); };
+  const tb = document.getElementById('ub-triage-btn');
+  if (tb) tb.onclick = ubStartTriage;
+}
+function ubAddTasks() {
+  const input = document.getElementById('ub-input');
+  const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
+  lines.forEach((text, i) => UB.tasks.push({ id: Date.now() + i, text, impact: null, effort: null, isBlocker: false, status: null }));
+  ubSave();
+  input.value = '';
+  ubRender();
+}
+function ubRemoveTask(i) {
+  UB.tasks.splice(i, 1);
+  ubSave();
+  ubRender();
+}
+
+// ─── PHASE: TRIAGE ────────────────────────────────────────────────────────────
+function ubGetUnclassified() { return UB.tasks.filter(t => t.status === null); }
+function ubStartTriage() {
+  const unc = ubGetUnclassified();
+  if (unc.length === 0) { ubPickFocus(); return; }
+  UB.triageIdx = 0;
+  UB.phase = 'triage';
+  ubRender();
+}
+
+function ubTriageHTML() {
+  const unc = ubGetUnclassified();
+  const task = unc[UB.triageIdx];
+  if (!task) return `<div style="color:#6B6880;max-width:520px">分類完成！</div>`;
+
+  const impactBtns = IMPACT_LABELS.map((l,i) =>
+    `<button class="ub-choice ${task.impact===i?'sel-green':''}" data-field="impact" data-val="${i}">${l}</button>`
+  ).join('');
+  const effortBtns = EFFORT_LABELS.map((l,i) =>
+    `<button class="ub-choice ${task.effort===i?'sel-warm':''}" data-field="effort" data-val="${i}">${l}</button>`
+  ).join('');
+  const blockerActive = task.isBlocker;
+
+  return `
+    <div style="width:100%;max-width:520px">
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
+        <span style="font-size:11px;color:#a09e9a;letter-spacing:0.12em;text-transform:uppercase">ADHD UNBLOCK</span>
+        <span style="font-size:11px;color:#a09e9a">還有 ${unc.length} 件 · 快速回答就好</span>
+      </div>
+      <div class="ub-header-line"></div>
+      <div style="background:#f0efec;border:1px solid #e5e3de;border-radius:10px;padding:24px;margin-bottom:20px">
+        <p style="font-size:16px;color:#1a1917;margin:0;line-height:1.5;font-family:'DM Sans',sans-serif">${escHtml(task.text)}</p>
+      </div>
+      <button id="ub-blocker-btn" class="ub-blocker-btn" style="
+        border:1px solid ${blockerActive ? '#FF6B35' : '#1E1C2A'};
+        background:${blockerActive ? 'rgba(255,107,53,0.1)' : 'transparent'};
+        color:${blockerActive ? '#FF6B35' : '#4A4760'};
+      ">${blockerActive ? '✓ 這是解鎖任務（做完會解開其他事）' : '這件事做完會解鎖其他任務？'}</button>
+      <div style="margin-bottom:16px">
+        <p style="font-size:11px;color:#6B6880;margin-bottom:8px;letter-spacing:0.08em">做這件事有幫助嗎？</p>
+        <div style="display:flex;gap:6px">${impactBtns}</div>
+      </div>
+      <div style="margin-bottom:24px">
+        <p style="font-size:11px;color:#6B6880;margin-bottom:8px;letter-spacing:0.08em">做起來難嗎？</p>
+        <div style="display:flex;gap:6px">${effortBtns}</div>
+      </div>
+      <button id="ub-confirm-btn" class="ub-btn-primary" ${(task.impact===null||task.effort===null)?'disabled':''}>下一件 →</button>
+      <div style="margin-top:8px"><button class="ub-btn-ghost" id="ub-back-btn">← 回清單</button></div>
+    </div>`;
+}
+function ubBindTriage() {
+  const unc = ubGetUnclassified();
+  const task = unc[UB.triageIdx];
+  if (!task) return;
+
+  document.getElementById('ub-blocker-btn').onclick = () => {
+    const idx = UB.tasks.findIndex(t => t.id === task.id);
+    UB.tasks[idx].isBlocker = !UB.tasks[idx].isBlocker;
+    ubSave(); ubRender();
+  };
+  document.querySelectorAll('[data-field]').forEach(btn => {
+    btn.onclick = () => {
+      const idx = UB.tasks.findIndex(t => t.id === task.id);
+      UB.tasks[idx][btn.dataset.field] = parseInt(btn.dataset.val);
+      ubSave(); ubRender();
+    };
+  });
+  document.getElementById('ub-confirm-btn').onclick = ubConfirmTriage;
+  document.getElementById('ub-back-btn').onclick = () => { UB.phase = 'dump'; ubRender(); };
+}
+function ubConfirmTriage() {
+  const unc = ubGetUnclassified();
+  const task = unc[UB.triageIdx];
+  if (!task || task.impact === null || task.effort === null) return;
+  const idx = UB.tasks.findIndex(t => t.id === task.id);
+  UB.tasks[idx].status = ubClassify(task.impact, task.effort, task.isBlocker);
+  ubSave();
+  const remaining = ubGetUnclassified().length;
+  if (remaining === 0) { ubPickFocus(); }
+  else { ubRender(); }
+}
+
+// ─── PHASE: FOCUS ─────────────────────────────────────────────────────────────
+function ubPickFocus(excludeId) {
+  const pool = UB.tasks.filter(t => t.status && t.status !== 'waiting' && t.id !== excludeId);
+  const blocker  = pool.find(t => t.status === 'blocker');
+  const quickWin = pool.find(t => t.status === 'quick-win');
+  const chosen = blocker || quickWin || pool[0];
+  if (chosen) {
+    UB.focusTask = chosen;
+    UB.timerSec = 300; UB.timerRunning = false; UB.timerDone = false;
+    UB.phase = 'focus';
+    ubRender();
+  } else {
+    UB.phase = 'dump'; ubRender();
+  }
+}
+
+function ubFocusHTML() {
+  const t = UB.focusTask;
+  if (!t) return '';
+  const meta = STATUS_META[t.status] || STATUS_META['quick-win'];
+  const pct = (UB.timerSec / 300) * 100;
+  const r = 80, circ = 2 * Math.PI * r;
+  const dashOffset = circ * (1 - pct / 100);
+  const ringColor = UB.timerDone ? '#2DD4A7' : UB.timerRunning ? '#FF6B35' : '#2A2836';
+  const timerLabel = UB.timerDone ? '完成' : `${Math.floor(UB.timerSec/60)}:${String(UB.timerSec%60).padStart(2,'0')}`;
+
+  return `
+    <div style="width:100%;max-width:520px;text-align:center">
+      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px;justify-content:center">
+        <span style="font-size:11px;color:#a09e9a;letter-spacing:0.12em;text-transform:uppercase">ADHD UNBLOCK</span>
+      </div>
+      <div class="ub-header-line"></div>
+      <div style="margin-bottom:8px">
+        <span class="ub-tag" style="background:${meta.bg};color:${meta.color}">${meta.label}</span>
+      </div>
+      <p style="font-size:11px;color:#a09e9a;margin-bottom:32px;letter-spacing:0.08em">現在只做這一件</p>
+      <div style="position:relative;width:180px;height:180px;margin:0 auto 32px">
+        <svg width="180" height="180" viewBox="0 0 180 180">
+          <circle cx="90" cy="90" r="${r}" fill="none" stroke="#e5e3de" stroke-width="6"/>
+          <circle cx="90" cy="90" r="${r}" fill="none" stroke="${ringColor}" stroke-width="6"
+            stroke-linecap="round"
+            stroke-dasharray="${circ}"
+            stroke-dashoffset="${dashOffset}"
+            transform="rotate(-90 90 90)"
+            class="ub-timer-ring"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span style="font-size:32px;font-weight:300;color:${UB.timerDone?'#2DD4A7':'#E8E6F0'};letter-spacing:-0.02em">${timerLabel}</span>
+          <span style="font-size:10px;color:#3D3B4D;margin-top:4px">5 分鐘</span>
+        </div>
+      </div>
+      <div style="background:#f0efec;border:1px solid #e5e3de;border-radius:10px;padding:20px 24px;margin-bottom:24px;text-align:left">
+        <p style="font-size:15px;color:#1a1917;margin:0;line-height:1.5;font-family:'DM Sans',sans-serif">${escHtml(t.text)}</p>
+        <p style="font-size:12px;color:#a09e9a;margin:8px 0 0;line-height:1.5">只做第一步。不用做完。只要開始。</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${!UB.timerRunning && !UB.timerDone ? `<button class="ub-btn-primary" id="ub-start-timer">開始 5 分鐘</button>` : ''}
+        ${UB.timerRunning ? `<button class="ub-btn-ghost" id="ub-pause-timer">暫停</button>` : ''}
+        ${UB.timerDone ? `<button class="ub-btn-primary" id="ub-done-btn">✓ 這件事做完了</button>` : ''}
+        <button class="ub-btn-ghost" id="ub-complete-btn">✓ 做完了</button>
+        <button class="ub-btn-ghost" id="ub-skip-btn">換一件</button>
+        <button class="ub-btn-ghost" id="ub-back-dump" style="margin-top:4px">回到清單</button>
+      </div>
+    </div>`;
+}
+function ubBindFocus() {
+  const startBtn = document.getElementById('ub-start-timer');
+  const pauseBtn = document.getElementById('ub-pause-timer');
+  const doneBtn  = document.getElementById('ub-done-btn');
+  if (startBtn) startBtn.onclick = ubStartTimer;
+  if (pauseBtn) pauseBtn.onclick = ubPauseTimer;
+  if (doneBtn)  doneBtn.onclick  = ubCompleteTask;
+  document.getElementById('ub-complete-btn').onclick = ubCompleteTask;
+  document.getElementById('ub-skip-btn').onclick     = ubSkipTask;
+  document.getElementById('ub-back-dump').onclick    = () => { clearInterval(UB._interval); UB.timerRunning=false; UB.phase='dump'; ubRender(); };
+}
+function ubStartTimer() {
+  UB.timerRunning = true;
+  ubRender();
+  UB._interval = setInterval(() => {
+    UB.timerSec--;
+    if (UB.timerSec <= 0) {
+      clearInterval(UB._interval); UB.timerRunning=false; UB.timerDone=true; UB.timerSec=0;
+    }
+    // Update ring and timer without full re-render
+    const ring = document.querySelector('.ub-timer-ring');
+    const label = document.querySelector('#unblock-app span[style*="32px"]');
+    if (ring) {
+      const pct = (UB.timerSec / 300) * 100;
+      const circ = 2 * Math.PI * 80;
+      ring.setAttribute('stroke-dashoffset', circ * (1 - pct / 100));
+      ring.setAttribute('stroke', UB.timerDone ? '#2DD4A7' : '#FF6B35');
+    }
+    if (label) label.textContent = UB.timerDone ? '完成' : `${Math.floor(UB.timerSec/60)}:${String(UB.timerSec%60).padStart(2,'0')}`;
+    if (UB.timerDone) { ubRender(); ubBindFocus(); }
+  }, 1000);
+}
+function ubPauseTimer() {
+  clearInterval(UB._interval);
+  UB.timerRunning = false;
+  ubRender();
+}
+function ubCompleteTask() {
+  clearInterval(UB._interval);
+  UB.tasks = UB.tasks.filter(t => t.id !== UB.focusTask.id);
+  ubSave();
+  UB.focusTask = null; UB.phase = 'dump'; UB.timerRunning=false;
+  ubRender();
+}
+function ubSkipTask() {
+  const excludeId = UB.focusTask.id;
+  const idx = UB.tasks.findIndex(t => t.id === excludeId);
+  if (idx >= 0) UB.tasks[idx].status = 'waiting';
+  clearInterval(UB._interval); UB.timerRunning=false;
+  ubSave();
+  ubPickFocus(excludeId);
+}
+</script>
+</body>
+</html>
