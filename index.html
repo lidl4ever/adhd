@@ -950,7 +950,7 @@ setInterval(() => { tipIdx = (tipIdx+1) % TIPS.length; renderTip(); }, 30000);
 renderTip();
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ADHD UNBLOCK ENGINE
+// ADHD UNBLOCK ENGINE  (Supabase 跨裝置同步)
 // ═══════════════════════════════════════════════════════════════════════════
 const UB = {
   phase: 'dump',      // dump | triage | focus
@@ -961,6 +961,7 @@ const UB = {
   timerRunning: false,
   timerDone: false,
   _interval: null,
+  loading: false,
 };
 
 const EFFORT_LABELS = ['很簡單', '有點難', '很難'];
@@ -981,10 +982,11 @@ function ubClassify(impact, effort, isBlocker) {
   return 'quick-win';
 }
 
-function openUnblock() {
+async function openUnblock() {
   document.getElementById('unblock-overlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  ubRender();
+  UB.phase = 'dump';
+  await ubRender();
 }
 function closeUnblock() {
   document.getElementById('unblock-overlay').style.display = 'none';
@@ -993,13 +995,70 @@ function closeUnblock() {
   UB.timerRunning = false;
 }
 
-function ubSave() { save('ub-tasks', UB.tasks); }
-function ubLoad() { UB.tasks = load('ub-tasks', []); }
+// ── Supabase 同步 ──
+async function ubSave() {
+  // 已由各操作函數直接寫入 Supabase，此函數保留供相容性
+}
+
+async function ubLoad() {
+  const { data, error } = await supa
+    .from('unblock_items')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) { console.error('ubLoad error:', error); return; }
+  // 將 Supabase 資料轉換成 UB.tasks 格式
+  UB.tasks = (data || []).map(r => ({
+    _id: r.id,           // Supabase uuid
+    id: r.id,            // 統一使用 uuid 作為 id
+    text: r.text,
+    impact: r.impact,
+    effort: r.effort,
+    isBlocker: r.is_blocker,
+    status: r.phase === 'dump' ? null : r.phase,
+    done: r.done,
+  }));
+}
+
+async function ubSaveTask(task) {
+  // 新增一筆到 Supabase
+  const { data, error } = await supa.from('unblock_items').insert({
+    text: task.text,
+    phase: 'dump',
+    impact: task.impact,
+    effort: task.effort,
+    is_blocker: task.isBlocker || false,
+    done: false,
+    sort_order: UB.tasks.length,
+  }).select().single();
+  if (error) { console.error('ubSaveTask error:', error); return null; }
+  return data;
+}
+
+async function ubUpdateTask(id, fields) {
+  const update = {};
+  if ('impact' in fields)    update.impact     = fields.impact;
+  if ('effort' in fields)    update.effort     = fields.effort;
+  if ('isBlocker' in fields) update.is_blocker = fields.isBlocker;
+  if ('status' in fields)    update.phase      = fields.status === null ? 'dump' : fields.status;
+  if ('done' in fields)      update.done       = fields.done;
+  const { error } = await supa.from('unblock_items').update(update).eq('id', id);
+  if (error) console.error('ubUpdateTask error:', error);
+}
+
+async function ubDeleteTask(id) {
+  const { error } = await supa.from('unblock_items').delete().eq('id', id);
+  if (error) console.error('ubDeleteTask error:', error);
+}
 
 // ── Render dispatcher ──
-function ubRender() {
-  ubLoad();
+async function ubRender() {
+  if (UB.loading) return;
+  UB.loading = true;
+  await ubLoad();
+  UB.loading = false;
   const app = document.getElementById('unblock-app');
+  if (!app) return;
   if (UB.phase === 'dump')   { app.innerHTML = ubDumpHTML(); ubBindDump(); }
   if (UB.phase === 'triage') { app.innerHTML = ubTriageHTML(); ubBindTriage(); }
   if (UB.phase === 'focus')  { app.innerHTML = ubFocusHTML(); ubBindFocus(); }
@@ -1055,7 +1114,7 @@ function ubDumpHTML() {
     const tag = meta ? `<span class="ub-tag" style="background:${meta.bg};color:${meta.color}">${meta.label}</span>` : '';
     return `<div class="ub-task-pill">
       <span style="flex:1">${escHtml(t.text)}</span>${tag}
-      <button onclick="ubRemoveTask(${i})" style="background:none;border:none;color:#3D3B4D;cursor:pointer;font-size:16px;padding:0 4px">×</button>
+      <button onclick="ubRemoveTask('${t.id}')" style="background:none;border:none;color:#3D3B4D;cursor:pointer;font-size:16px;padding:0 4px">×</button>
     </div>`;
   }).join('');
 
@@ -1093,17 +1152,27 @@ function ubBindDump() {
   const tb = document.getElementById('ub-triage-btn');
   if (tb) tb.onclick = ubStartTriage;
 }
-function ubAddTasks() {
+async function ubAddTasks() {
   const input = document.getElementById('ub-input');
   const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
-  lines.forEach((text, i) => UB.tasks.push({ id: Date.now() + i, text, impact: null, effort: null, isBlocker: false, status: null }));
-  ubSave();
+  if (lines.length === 0) return;
   input.value = '';
+  // 批次插入
+  const rows = lines.map((text, i) => ({
+    text,
+    phase: 'dump',
+    impact: null,
+    effort: null,
+    is_blocker: false,
+    done: false,
+    sort_order: (UB.tasks.length || 0) + i,
+  }));
+  const { error } = await supa.from('unblock_items').insert(rows);
+  if (error) { console.error('ubAddTasks error:', error); return; }
   ubRender();
 }
-function ubRemoveTask(i) {
-  UB.tasks.splice(i, 1);
-  ubSave();
+async function ubRemoveTask(id) {
+  await ubDeleteTask(id);
   ubRender();
 }
 
@@ -1162,36 +1231,42 @@ function ubBindTriage() {
   const task = unc[UB.triageIdx];
   if (!task) return;
 
-  document.getElementById('ub-blocker-btn').onclick = () => {
-    const idx = UB.tasks.findIndex(t => t.id === task.id);
-    UB.tasks[idx].isBlocker = !UB.tasks[idx].isBlocker;
-    ubSave(); ubRender();
+  document.getElementById('ub-blocker-btn').onclick = async () => {
+    const newVal = !task.isBlocker;
+    await ubUpdateTask(task.id, { isBlocker: newVal });
+    ubRender();
   };
   document.querySelectorAll('[data-field]').forEach(btn => {
-    btn.onclick = () => {
-      const idx = UB.tasks.findIndex(t => t.id === task.id);
-      UB.tasks[idx][btn.dataset.field] = parseInt(btn.dataset.val);
-      ubSave(); ubRender();
+    btn.onclick = async () => {
+      await ubUpdateTask(task.id, { [btn.dataset.field]: parseInt(btn.dataset.val) });
+      ubRender();
     };
   });
   document.getElementById('ub-confirm-btn').onclick = ubConfirmTriage;
   document.getElementById('ub-back-btn').onclick = () => { UB.phase = 'dump'; ubRender(); };
 }
-function ubConfirmTriage() {
+async function ubConfirmTriage() {
   const unc = ubGetUnclassified();
   const task = unc[UB.triageIdx];
   if (!task || task.impact === null || task.effort === null) return;
-  const idx = UB.tasks.findIndex(t => t.id === task.id);
-  UB.tasks[idx].status = ubClassify(task.impact, task.effort, task.isBlocker);
-  ubSave();
+  const newStatus = ubClassify(task.impact, task.effort, task.isBlocker);
+  await ubUpdateTask(task.id, { status: newStatus });
+  // Re-load to check remaining
+  await ubLoad();
   const remaining = ubGetUnclassified().length;
-  if (remaining === 0) { ubPickFocus(); }
-  else { ubRender(); }
+  if (remaining === 0) {
+    // Reload focusable list
+    const app = document.getElementById('unblock-app');
+    ubPickFocusFromLoaded();
+  } else {
+    ubRender();
+  }
 }
 
 // ─── PHASE: FOCUS ─────────────────────────────────────────────────────────────
-function ubPickFocus(excludeId) {
-  const pool = UB.tasks.filter(t => t.status && t.status !== 'waiting' && t.id !== excludeId);
+// 使用已載入的 UB.tasks（不重新 fetch）
+function ubPickFocusFromLoaded(excludeId) {
+  const pool = UB.tasks.filter(t => t.status && t.status !== 'waiting' && !t.done && t.id !== excludeId);
   const blocker  = pool.find(t => t.status === 'blocker');
   const quickWin = pool.find(t => t.status === 'quick-win');
   const chosen = blocker || quickWin || pool[0];
@@ -1199,10 +1274,17 @@ function ubPickFocus(excludeId) {
     UB.focusTask = chosen;
     UB.timerSec = 300; UB.timerRunning = false; UB.timerDone = false;
     UB.phase = 'focus';
-    ubRender();
+    const app = document.getElementById('unblock-app');
+    if (app) { app.innerHTML = ubFocusHTML(); ubBindFocus(); }
   } else {
-    UB.phase = 'dump'; ubRender();
+    UB.phase = 'dump';
+    ubRender();
   }
+}
+
+async function ubPickFocus(excludeId) {
+  await ubLoad();
+  ubPickFocusFromLoaded(excludeId);
 }
 
 function ubFocusHTML() {
@@ -1291,20 +1373,22 @@ function ubPauseTimer() {
   UB.timerRunning = false;
   ubRender();
 }
-function ubCompleteTask() {
+async function ubCompleteTask() {
   clearInterval(UB._interval);
-  UB.tasks = UB.tasks.filter(t => t.id !== UB.focusTask.id);
-  ubSave();
-  UB.focusTask = null; UB.phase = 'dump'; UB.timerRunning=false;
+  UB.timerRunning = false;
+  if (UB.focusTask) {
+    await ubDeleteTask(UB.focusTask.id);
+  }
+  UB.focusTask = null; UB.phase = 'dump';
   ubRender();
 }
-function ubSkipTask() {
-  const excludeId = UB.focusTask.id;
-  const idx = UB.tasks.findIndex(t => t.id === excludeId);
-  if (idx >= 0) UB.tasks[idx].status = 'waiting';
-  clearInterval(UB._interval); UB.timerRunning=false;
-  ubSave();
-  ubPickFocus(excludeId);
+async function ubSkipTask() {
+  const excludeId = UB.focusTask ? UB.focusTask.id : null;
+  if (excludeId) {
+    await ubUpdateTask(excludeId, { status: 'waiting' });
+  }
+  clearInterval(UB._interval); UB.timerRunning = false;
+  await ubPickFocus(excludeId);
 }
 </script>
 </body>
