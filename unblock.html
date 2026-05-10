@@ -317,6 +317,7 @@ const UB = {
   tasks: [],
   categories: [],
   triageIdx: 0,
+  triageFilterIds: null, // Set of IDs when triaging a specific subset
   focusTask: null,
   timerSec: 300,
   timerRunning: false,
@@ -409,8 +410,9 @@ async function addTasks(lines) {
     sort_order: (UB.tasks.length || 0) + i,
     urgency: null, category_id: null,
   }));
-  const { error } = await supa.from('unblock_items').insert(rows);
+  const { data, error } = await supa.from('unblock_items').insert(rows).select();
   if (error) console.error('addTasks:', error);
+  return data || [];
 }
 
 async function updateTask(id, fields) {
@@ -608,7 +610,8 @@ async function doAddAndTriage() {
   const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) return;
   input.value = '';
-  await addTasks(lines);
+  const inserted = await addTasks(lines);
+  UB.triageFilterIds = new Set(inserted.map(r => r.id));
   await loadTasks();
   UB.triageIdx = 0;
   UB.phase = 'triage';
@@ -623,9 +626,15 @@ async function removeTask(id) {
 // ════════════════════════════════════════════════════════════════════════════
 // PHASE: TRIAGE
 // ════════════════════════════════════════════════════════════════════════════
-function getUnclassified() { return UB.tasks.filter(t => t.status === null); }
+function getUnclassified() {
+  const all = UB.tasks.filter(t => t.status === null);
+  if (UB.triageFilterIds && UB.triageFilterIds.size > 0)
+    return all.filter(t => UB.triageFilterIds.has(t.id));
+  return all;
+}
 
 function startTriage() {
+  UB.triageFilterIds = null;
   const unc = getUnclassified();
   if (unc.length === 0) { pickFocus(); return; }
   UB.triageIdx = 0;
@@ -734,7 +743,7 @@ function bindTriage() {
   });
 
   document.getElementById('confirm-btn').onclick = confirmTriage;
-  document.getElementById('back-btn').onclick = () => { UB.phase = 'dump'; render(); };
+  document.getElementById('back-btn').onclick = () => { UB.triageFilterIds = null; UB.phase = 'dump'; render(); };
 }
 
 async function confirmTriage() {
