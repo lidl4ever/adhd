@@ -555,7 +555,8 @@ function dumpHTML() {
       resize:vertical;outline:none;line-height:1.8;
     "></textarea>
     <div style="display:flex;gap:8px;margin-top:8px">
-      <button class="btn-primary" id="add-btn">加入清單</button>
+      <button class="btn-ghost" id="add-btn" style="flex:1">加入清單</button>
+      <button class="btn-primary" id="add-triage-btn" style="flex:2">加入並立刻分類 →</button>
     </div>
 
     ${blockersHTML}
@@ -585,6 +586,7 @@ function pillHTML(t) {
 
 function bindDump() {
   document.getElementById('add-btn').onclick = doAdd;
+  document.getElementById('add-triage-btn').onclick = doAddAndTriage;
   document.getElementById('dump-input').onkeydown = e => {
     if (e.key === 'Enter' && e.metaKey) doAdd();
   };
@@ -599,6 +601,18 @@ async function doAdd() {
   input.value = '';
   await addTasks(lines);
   await render();
+}
+
+async function doAddAndTriage() {
+  const input = document.getElementById('dump-input');
+  const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return;
+  input.value = '';
+  await addTasks(lines);
+  await loadTasks();
+  UB.triageIdx = 0;
+  UB.phase = 'triage';
+  render(true);
 }
 
 async function removeTask(id) {
