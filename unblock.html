@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ADHD Unblock — YJ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;600&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #f7f6f3;
+  --panel:    #f0efec;
+  --border:   #e5e3de;
+  --border-2: #d0cdc6;
+  --text:     #1a1917;
+  --text-2:   #6b6860;
+  --text-3:   #a09e9a;
+  --accent:   #FF6B35;
+  --green:    #2DD4A7;
+  --purple:   #A78BFA;
+  --yellow:   #FBBF24;
+}
+
+body {
+  font-family: 'DM Mono', 'Courier New', monospace;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── Topbar ── */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex; align-items: center; gap: 16px;
+}
+.topbar-back {
+  font-size: 12px; color: var(--text-2); text-decoration: none;
+  padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+  transition: all 0.15s;
+}
+.topbar-back:hover { border-color: var(--border-2); color: var(--text); }
+.topbar-title {
+  font-size: 12px; color: var(--text-3);
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+.topbar-phase {
+  font-size: 12px; color: var(--text-3);
+  margin-left: auto;
+}
+
+/* ── Main layout ── */
+.page {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+/* ── Section header ── */
+.section-head {
+  display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px;
+}
+.section-label {
+  font-size: 11px; color: var(--text-3);
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+.section-sub { font-size: 11px; color: var(--text-3); }
+.section-line {
+  height: 1px;
+  background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+  margin: 8px 0 32px;
+}
+
+/* ── Buttons ── */
+.btn-primary {
+  width: 100%; padding: 12px 28px;
+  background: var(--text); color: var(--bg);
+  border: none; border-radius: 6px;
+  font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500;
+  letter-spacing: 0.04em; cursor: pointer; transition: all 0.15s;
+}
+.btn-primary:hover { background: #333; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+.btn-ghost {
+  width: 100%; padding: 10px 20px;
+  background: transparent; color: var(--text-2);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-ghost:hover { border-color: var(--border-2); color: var(--text); }
+
+/* ── Task pill ── */
+.task-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; color: var(--text);
+}
+.task-pill-del {
+  background: none; border: none; color: var(--text-3);
+  cursor: pointer; font-size: 16px; padding: 0 4px;
+  margin-left: auto; flex-shrink: 0;
+}
+.task-pill-del:hover { color: var(--text); }
+
+/* ── Choice buttons ── */
+.choice-row { display: flex; gap: 6px; }
+.choice {
+  flex: 1; padding: 12px 8px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel); color: var(--text-2);
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  cursor: pointer; transition: all 0.15s; text-align: center;
+  line-height: 1.4;
+}
+.choice:hover { border-color: var(--border-2); color: var(--text); }
+.choice.sel-green  { border-color: var(--green);  color: #0d9e7a; background: rgba(45,212,167,0.1); }
+.choice.sel-warm   { border-color: var(--accent); color: #d4500f; background: rgba(255,107,53,0.1); }
+.choice.sel-yellow { border-color: var(--yellow); color: #b45309; background: rgba(251,191,36,0.1); }
+.choice.sel-purple { border-color: var(--purple); color: #7c3aed; background: rgba(167,139,250,0.1); }
+.choice.sel-gray   { border-color: var(--border-2); color: var(--text-2); background: var(--panel); }
+
+/* ── Tag ── */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 500;
+}
+
+/* ── Blocker button ── */
+.blocker-btn {
+  width: 100%; padding: 11px;
+  border-radius: 8px; margin-bottom: 20px;
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  cursor: pointer; transition: all 0.15s;
+}
+
+/* ── Timer ring ── */
+.timer-ring { transition: stroke-dashoffset 1s linear; }
+
+/* ── Dump: grouped list ── */
+.group-header {
+  font-size: 11px; color: var(--text-3);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  margin: 20px 0 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.group-header-line { flex: 1; height: 1px; background: var(--border); }
+.group-count {
+  font-size: 10px; padding: 2px 7px; border-radius: 10px;
+  background: var(--panel); color: var(--text-3);
+}
+.group-urgent { color: #ef4444; }
+
+/* ── Blockers section ── */
+.blocker-section {
+  border: 1px solid rgba(255,107,53,0.3);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 20px;
+  background: rgba(255,107,53,0.04);
+}
+.blocker-section-title {
+  font-size: 11px; font-weight: 500; color: var(--accent);
+  letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px;
+}
+
+/* ── Settings panel ── */
+.settings-overlay {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(247,246,243,0.96); backdrop-filter: blur(4px);
+  overflow-y: auto;
+}
+.settings-overlay.open { display: block; }
+.settings-page { max-width: 480px; margin: 0 auto; padding: 48px 24px; }
+.settings-title { font-size: 18px; font-weight: 500; margin-bottom: 32px; }
+.cat-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  cursor: grab; transition: opacity 0.15s;
+}
+.cat-row:active { cursor: grabbing; }
+.cat-row.drag-over { border-top: 2px solid var(--accent); }
+.cat-row.dragging { opacity: 0.35; }
+.cat-drag-handle {
+  color: var(--text-3); font-size: 13px; cursor: grab; padding: 0 2px;
+  user-select: none;
+}
+.cat-emoji-btn {
+  font-size: 18px; padding: 4px 6px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.cat-emoji-btn:hover { border-color: var(--border-2); }
+.cat-name-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text);
+}
+.cat-del-btn {
+  background: none; border: none; color: var(--text-3);
+  cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px;
+  transition: color 0.15s;
+}
+.cat-del-btn:hover { color: #ef4444; }
+
+/* ── Emoji picker ── */
+.emoji-picker {
+  display: none; position: fixed; z-index: 600;
+  background: var(--bg); border: 1px solid var(--border-2);
+  border-radius: 12px; padding: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  width: 256px;
+}
+.emoji-picker.open { display: block; }
+.emoji-picker-grid {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px;
+}
+.emoji-picker-grid button {
+  font-size: 20px; background: none; border: none;
+  border-radius: 6px; cursor: pointer; padding: 4px;
+  line-height: 1; transition: background 0.1s;
+}
+.emoji-picker-grid button:hover { background: var(--panel); }
+.emoji-picker-label {
+  font-size: 10px; color: var(--text-3); letter-spacing: 0.08em;
+  text-transform: uppercase; margin: 8px 0 4px;
+}
+.add-cat-row {
+  display: flex; gap: 8px; margin-top: 14px;
+}
+.add-cat-input {
+  flex: 1; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px;
+  font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text);
+  outline: none;
+}
+.add-cat-input:focus { border-color: var(--border-2); }
+.add-cat-btn {
+  padding: 8px 14px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 6px; font-family: 'DM Mono', monospace; font-size: 12px;
+  color: var(--text-2); cursor: pointer;
+}
+.add-cat-btn:hover { color: var(--text); border-color: var(--border-2); }
+
+::placeholder { color: #b0aea8; }
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-title">ADHD Unblock</div>
+  <div class="topbar-phase" id="topbar-phase"></div>
+  <button onclick="openSettings()" style="
+    background:none;border:1px solid var(--border);border-radius:6px;
+    padding:6px 12px;font-family:'DM Mono',monospace;font-size:12px;
+    color:var(--text-2);cursor:pointer;transition:all 0.15s;margin-left:auto;
+  " onmouseover="this.style.borderColor='var(--border-2)';this.style.color='var(--text)'"
+     onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-2)'">
+    ⚙ 分類管理
+  </button>
+</div>
+
+<!-- Main app area -->
+<div class="page">
+  <div id="app"></div>
+</div>
+
+<!-- Emoji picker (shared, repositioned on open) -->
+<div class="emoji-picker" id="emoji-picker">
+  <div class="emoji-picker-label">工作 &amp; 目標</div>
+  <div class="emoji-picker-grid" id="emoji-grid"></div>
+</div>
+
+<!-- Settings overlay -->
+<div class="settings-overlay" id="settings-overlay">
+  <div class="settings-page">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px">
+      <div class="settings-title" style="margin-bottom:0">分類管理</div>
+      <button onclick="closeSettings()" style="
+        background:none;border:1px solid var(--border);border-radius:6px;
+        padding:6px 14px;font-family:'DM Mono',monospace;font-size:12px;
+        color:var(--text-2);cursor:pointer;
+      ">完成</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-3);margin-bottom:24px;line-height:1.6">
+      編輯名稱、排序、新增或刪除分類。刪除後，該分類的任務會變成未分類。
+    </p>
+    <div id="cat-list"></div>
+    <div class="add-cat-row">
+      <input class="add-cat-input" id="new-cat-emoji" placeholder="emoji" style="width:56px;flex:none;text-align:center">
+      <input class="add-cat-input" id="new-cat-name" placeholder="新增分類名稱..." onkeydown="if(event.key==='Enter')addCategory()">
+      <button class="add-cat-btn" onclick="addCategory()">+</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Supabase ────────────────────────────────────────────────────────────────
+const SUPA_URL = 'https://ijzjwknrhjehskhrvvzr.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlqemp3a25yaGplaHNraHJ2dnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMzY2MjQsImV4cCI6MjA5MzcxMjYyNH0.uCaE_oXUZkLWiZa4-xjLz5Q7Q99mr3D9LTx_TFraY3k';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── State ───────────────────────────────────────────────────────────────────
+const UB = {
+  phase: 'dump',
+  tasks: [],
+  categories: [],
+  triageIdx: 0,
+  focusTask: null,
+  timerSec: 300,
+  timerRunning: false,
+  timerDone: false,
+  _interval: null,
+  loading: false,
+};
+
+const STATUS_META = {
+  blocker:    { label: '解鎖任務', color: '#FF6B35', bg: 'rgba(255,107,53,0.12)' },
+  'quick-win':{ label: '立即可做', color: '#2DD4A7', bg: 'rgba(45,212,167,0.12)' },
+  defer:      { label: '延後處理', color: '#A78BFA', bg: 'rgba(167,139,250,0.12)' },
+  noise:      { label: '低優先',   color: '#6B7280', bg: 'rgba(107,114,128,0.08)' },
+  waiting:    { label: '等待中',   color: '#FBBF24', bg: 'rgba(251,191,36,0.12)' },
+};
+
+const URGENCY_META = {
+  urgent: { label: '🔴 今天必做', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
+  soon:   { label: '🟡 本週內',   color: '#d97706', bg: 'rgba(245,158,11,0.1)' },
+  whenever:{ label: '⚪ 隨時',    color: '#a09e9a', bg: 'rgba(160,158,154,0.1)' },
+};
+
+// ── Category defaults (used if Supabase has nothing) ─────────────────────────
+const DEFAULT_CATEGORIES = [
+  { emoji: '💼', label: '找工作',  sort_order: 0 },
+  { emoji: '✈️', label: '出國準備', sort_order: 1 },
+  { emoji: '🏠', label: '生活雜事', sort_order: 2 },
+  { emoji: '🎨', label: '藝術',     sort_order: 3 },
+];
+
+// ── Supabase: categories ─────────────────────────────────────────────────────
+async function loadCategories() {
+  const { data, error } = await supa
+    .from('unblock_categories')
+    .select('*')
+    .order('sort_order', { ascending: true });
+  if (error) { console.error('loadCategories:', error); UB.categories = []; return; }
+  UB.categories = data || [];
+  // Seed defaults if empty
+  if (UB.categories.length === 0) {
+    const { data: seeded } = await supa
+      .from('unblock_categories')
+      .insert(DEFAULT_CATEGORIES)
+      .select();
+    UB.categories = seeded || [];
+  }
+}
+
+async function saveCategory(cat) {
+  if (cat.id) {
+    await supa.from('unblock_categories').update({ label: cat.label, emoji: cat.emoji, sort_order: cat.sort_order }).eq('id', cat.id);
+  } else {
+    const { data } = await supa.from('unblock_categories').insert({ label: cat.label, emoji: cat.emoji, sort_order: cat.sort_order }).select().single();
+    return data;
+  }
+  return cat;
+}
+
+async function deleteCategory(id) {
+  await supa.from('unblock_categories').delete().eq('id', id);
+  // Nullify category on orphaned tasks
+  await supa.from('unblock_items').update({ category_id: null }).eq('category_id', id);
+}
+
+// ── Supabase: tasks ──────────────────────────────────────────────────────────
+async function loadTasks() {
+  const { data, error } = await supa
+    .from('unblock_items')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) { console.error('loadTasks:', error); return; }
+  UB.tasks = (data || []).map(r => ({
+    id: r.id,
+    text: r.text,
+    impact: r.impact,
+    effort: r.effort,
+    isBlocker: r.is_blocker,
+    urgency: r.urgency || null,
+    categoryId: r.category_id || null,
+    status: r.phase === 'dump' ? null : r.phase,
+    done: r.done,
+  }));
+}
+
+async function addTasks(lines) {
+  const rows = lines.map((text, i) => ({
+    text, phase: 'dump', impact: null, effort: null,
+    is_blocker: false, done: false,
+    sort_order: (UB.tasks.length || 0) + i,
+    urgency: null, category_id: null,
+  }));
+  const { error } = await supa.from('unblock_items').insert(rows);
+  if (error) console.error('addTasks:', error);
+}
+
+async function updateTask(id, fields) {
+  const update = {};
+  if ('impact'    in fields) update.impact      = fields.impact;
+  if ('effort'    in fields) update.effort      = fields.effort;
+  if ('isBlocker' in fields) update.is_blocker  = fields.isBlocker;
+  if ('urgency'   in fields) update.urgency     = fields.urgency;
+  if ('categoryId'in fields) update.category_id = fields.categoryId;
+  if ('status'    in fields) update.phase       = fields.status === null ? 'dump' : fields.status;
+  if ('done'      in fields) update.done        = fields.done;
+  const { error } = await supa.from('unblock_items').update(update).eq('id', id);
+  if (error) console.error('updateTask:', error);
+}
+
+async function deleteTask(id) {
+  const { error } = await supa.from('unblock_items').delete().eq('id', id);
+  if (error) console.error('deleteTask:', error);
+}
+
+// ── Classify ─────────────────────────────────────────────────────────────────
+function classify(impact, effort, isBlocker) {
+  if (isBlocker) return 'blocker';
+  if (impact === 2 && effort <= 1) return 'quick-win';
+  if (impact === 2 && effort === 2) return 'defer';
+  if (impact <= 1) return 'noise';
+  return 'quick-win';
+}
+
+// ── Render dispatcher ─────────────────────────────────────────────────────────
+async function render(skipLoad) {
+  if (UB.loading) return;
+  UB.loading = true;
+  if (!skipLoad) {
+    await Promise.all([loadCategories(), loadTasks()]);
+  }
+  UB.loading = false;
+
+  const phases = { dump: 'Dump', triage: 'Triage', focus: 'Focus' };
+  document.getElementById('topbar-phase').textContent = phases[UB.phase] || '';
+
+  const app = document.getElementById('app');
+  if (UB.phase === 'dump')   { app.innerHTML = dumpHTML();   bindDump(); }
+  if (UB.phase === 'triage') { app.innerHTML = triageHTML(); bindTriage(); }
+  if (UB.phase === 'focus')  { app.innerHTML = focusHTML();  bindFocus(); }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE: DUMP
+// ════════════════════════════════════════════════════════════════════════════
+function catById(id) {
+  return UB.categories.find(c => c.id === id) || null;
+}
+
+function dumpHTML() {
+  const blockers   = UB.tasks.filter(t => t.status === 'blocker' && !t.done);
+  const triageable = UB.tasks.filter(t => t.status === null);
+  const classified = UB.tasks.filter(t => t.status !== null && t.status !== 'blocker' && !t.done);
+
+  // Group classified tasks by category
+  const byCategory = {};
+  const uncatKey = '__none__';
+  classified.forEach(t => {
+    const key = t.categoryId || uncatKey;
+    if (!byCategory[key]) byCategory[key] = [];
+    byCategory[key].push(t);
+  });
+
+  // Build blocker section
+  let blockersHTML = '';
+  if (blockers.length > 0) {
+    const rows = blockers.map(t => pillHTML(t)).join('');
+    blockersHTML = `
+      <div class="blocker-section">
+        <div class="blocker-section-title">🔴 解鎖任務 — 做完才能推進其他事</div>
+        <div style="display:flex;flex-direction:column;gap:6px">${rows}</div>
+      </div>`;
+  }
+
+  // Build category groups
+  let groupsHTML = '';
+  const catOrder = [...UB.categories.map(c => c.id), uncatKey];
+  catOrder.forEach(key => {
+    const items = byCategory[key];
+    if (!items || items.length === 0) return;
+    const cat = key === uncatKey ? null : catById(key);
+    const label = cat ? `${cat.emoji} ${cat.label}` : '未分類';
+    const urgentCount = items.filter(t => t.urgency === 'urgent').length;
+    const urgentBadge = urgentCount > 0
+      ? `<span class="group-count group-urgent">${urgentCount} 件急迫</span>` : '';
+    const sortedItems = [...items].sort((a, b) => {
+      const urgOrder = { urgent: 0, soon: 1, whenever: 2, null: 3 };
+      return (urgOrder[a.urgency] ?? 3) - (urgOrder[b.urgency] ?? 3);
+    });
+    groupsHTML += `
+      <div>
+        <div class="group-header">
+          ${escHtml(label)}
+          <span class="group-count">${items.length} 件</span>
+          ${urgentBadge}
+          <div class="group-header-line"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">${sortedItems.map(t => pillHTML(t)).join('')}</div>
+      </div>`;
+  });
+
+  // Triageable (unclassified dump items)
+  let dumpListHTML = '';
+  if (triageable.length > 0) {
+    dumpListHTML = `
+      <div class="group-header" style="margin-top:20px">
+        待分類
+        <span class="group-count">${triageable.length} 件</span>
+        <div class="group-header-line"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${triageable.map(t => pillHTML(t)).join('')}
+      </div>`;
+  }
+
+  const total = UB.tasks.filter(t => !t.done).length;
+  const actionBtn = UB.tasks.length === 0 ? '' : triageable.length > 0
+    ? `<button class="btn-primary" id="triage-btn" style="margin-top:20px">開始分類 (${triageable.length} 件) →</button>`
+    : `<button class="btn-primary" id="triage-btn" style="margin-top:20px">選出今天要做的 →</button>`;
+
+  return `
+    <div class="section-head">
+      <span class="section-label">腦袋清空</span>
+      ${total > 0 ? `<span class="section-sub">${total} 件待處理</span>` : ''}
+    </div>
+    <div class="section-line"></div>
+
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:20px;line-height:1.7">
+      把腦袋裡所有還沒做的事倒出來。<br>不用整理，不用排序，一行一件事。
+    </p>
+
+    <textarea id="dump-input" placeholder="買廚房層架&#10;追蹤 Mistral 申請狀態&#10;預約睡眠門診..." style="
+      width:100%;min-height:140px;background:var(--panel);
+      border:1px solid var(--border);border-radius:8px;
+      padding:16px;color:var(--text);
+      font-family:'DM Mono',monospace;font-size:13px;
+      resize:vertical;outline:none;line-height:1.8;
+    "></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn-primary" id="add-btn">加入清單</button>
+    </div>
+
+    ${blockersHTML}
+    ${groupsHTML}
+    ${dumpListHTML}
+    ${actionBtn}`;
+}
+
+function pillHTML(t) {
+  const meta     = t.status ? STATUS_META[t.status] : null;
+  const urgMeta  = t.urgency ? URGENCY_META[t.urgency] : null;
+  const cat      = t.categoryId ? catById(t.categoryId) : null;
+
+  const statusTag = meta
+    ? `<span class="tag" style="background:${meta.bg};color:${meta.color};flex-shrink:0">${meta.label}</span>` : '';
+  const urgTag = urgMeta
+    ? `<span class="tag" style="background:${urgMeta.bg};color:${urgMeta.color};flex-shrink:0">${urgMeta.label}</span>` : '';
+  const catTag = cat
+    ? `<span class="tag" style="background:var(--panel);color:var(--text-3);border:1px solid var(--border);flex-shrink:0">${cat.emoji} ${escHtml(cat.label)}</span>` : '';
+
+  return `<div class="task-pill">
+    <span style="flex:1">${escHtml(t.text)}</span>
+    ${urgTag}${statusTag}${catTag}
+    <button class="task-pill-del" onclick="removeTask('${t.id}')">×</button>
+  </div>`;
+}
+
+function bindDump() {
+  document.getElementById('add-btn').onclick = doAdd;
+  document.getElementById('dump-input').onkeydown = e => {
+    if (e.key === 'Enter' && e.metaKey) doAdd();
+  };
+  const tb = document.getElementById('triage-btn');
+  if (tb) tb.onclick = startTriage;
+}
+
+async function doAdd() {
+  const input = document.getElementById('dump-input');
+  const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return;
+  input.value = '';
+  await addTasks(lines);
+  await render();
+}
+
+async function removeTask(id) {
+  await deleteTask(id);
+  await render();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE: TRIAGE
+// ════════════════════════════════════════════════════════════════════════════
+function getUnclassified() { return UB.tasks.filter(t => t.status === null); }
+
+function startTriage() {
+  const unc = getUnclassified();
+  if (unc.length === 0) { pickFocus(); return; }
+  UB.triageIdx = 0;
+  UB.phase = 'triage';
+  render(true);
+}
+
+function triageHTML() {
+  const unc  = getUnclassified();
+  const task = unc[UB.triageIdx];
+  if (!task) return `<div style="color:var(--text-2)">分類完成！</div>`;
+
+  const progress = `${UB.triageIdx + 1} / ${unc.length}`;
+
+  // Urgency choices
+  const urgChoices = [
+    { val: 'urgent',   label: '🔴 今天必做', cls: 'sel-warm' },
+    { val: 'soon',     label: '🟡 本週內',   cls: 'sel-yellow' },
+    { val: 'whenever', label: '⚪ 隨時',     cls: 'sel-gray' },
+  ].map(u => `<button class="choice ${task.urgency===u.val ? u.cls : ''}" data-field="urgency" data-val="${u.val}">${u.label}</button>`).join('');
+
+  // Category choices
+  const catChoices = UB.categories.map(c =>
+    `<button class="choice ${task.categoryId===c.id ? 'sel-purple' : ''}" data-field="categoryId" data-val="${c.id}">${c.emoji} ${escHtml(c.label)}</button>`
+  ).join('');
+  const noCatChoice = `<button class="choice ${task.categoryId===null ? 'sel-gray' : ''}" data-field="categoryId" data-val="__none__">其他</button>`;
+
+  // Impact / Effort
+  const impactChoices = ['沒什麼用','有些用','很有用'].map((l,i) =>
+    `<button class="choice ${task.impact===i?'sel-green':''}" data-field="impact" data-val="${i}">${l}</button>`
+  ).join('');
+  const effortChoices = ['很簡單','有點難','很難'].map((l,i) =>
+    `<button class="choice ${task.effort===i?'sel-warm':''}" data-field="effort" data-val="${i}">${l}</button>`
+  ).join('');
+
+  const blockerActive = task.isBlocker;
+  const canConfirm = task.urgency !== null && task.impact !== null && task.effort !== null;
+
+  return `
+    <div class="section-head">
+      <span class="section-label">分類</span>
+      <span class="section-sub">${progress} — 快速選就好</span>
+    </div>
+    <div class="section-line"></div>
+
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:24px">
+      <p style="font-size:16px;color:var(--text);margin:0;line-height:1.5;font-family:'DM Sans',sans-serif">${escHtml(task.text)}</p>
+    </div>
+
+    <button id="blocker-btn" class="blocker-btn" style="
+      border:1px solid ${blockerActive ? '#FF6B35' : 'var(--border)'};
+      background:${blockerActive ? 'rgba(255,107,53,0.1)' : 'transparent'};
+      color:${blockerActive ? '#FF6B35' : 'var(--text-2)'};
+    ">${blockerActive ? '✓ 解鎖任務（做完會推進其他事）' : '這件事做完會解鎖其他任務？'}</button>
+
+    <div style="margin-bottom:16px">
+      <p style="font-size:11px;color:var(--text-3);margin-bottom:8px;letter-spacing:0.08em">時間壓力？</p>
+      <div class="choice-row">${urgChoices}</div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <p style="font-size:11px;color:var(--text-3);letter-spacing:0.08em">屬於哪類？</p>
+        <button onclick="openSettings()" title="管理分類" style="
+          background:none;border:none;font-size:13px;color:var(--text-3);
+          cursor:pointer;padding:0 2px;line-height:1;opacity:0.7;
+          transition:opacity 0.15s;
+        " onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7">⚙</button>
+      </div>
+      <div class="choice-row" style="flex-wrap:wrap;gap:6px">${catChoices}${noCatChoice}</div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <p style="font-size:11px;color:var(--text-3);margin-bottom:8px;letter-spacing:0.08em">做了有幫助嗎？</p>
+      <div class="choice-row">${impactChoices}</div>
+    </div>
+
+    <div style="margin-bottom:24px">
+      <p style="font-size:11px;color:var(--text-3);margin-bottom:8px;letter-spacing:0.08em">做起來難嗎？</p>
+      <div class="choice-row">${effortChoices}</div>
+    </div>
+
+    <button class="btn-primary" id="confirm-btn" ${canConfirm ? '' : 'disabled'}>下一件 →</button>
+    <div style="margin-top:8px"><button class="btn-ghost" id="back-btn">← 回清單</button></div>`;
+}
+
+function bindTriage() {
+  const unc  = getUnclassified();
+  const task = unc[UB.triageIdx];
+  if (!task) return;
+
+  document.getElementById('blocker-btn').onclick = async () => {
+    await updateTask(task.id, { isBlocker: !task.isBlocker });
+    await render();
+  };
+
+  document.querySelectorAll('[data-field]').forEach(btn => {
+    btn.onclick = async () => {
+      const field = btn.dataset.field;
+      let val = btn.dataset.val;
+      if (field === 'impact' || field === 'effort') val = parseInt(val);
+      if (field === 'categoryId' && val === '__none__') val = null;
+      await updateTask(task.id, { [field]: val });
+      await render();
+    };
+  });
+
+  document.getElementById('confirm-btn').onclick = confirmTriage;
+  document.getElementById('back-btn').onclick = () => { UB.phase = 'dump'; render(); };
+}
+
+async function confirmTriage() {
+  const unc  = getUnclassified();
+  const task = unc[UB.triageIdx];
+  if (!task || task.urgency === null || task.impact === null || task.effort === null) return;
+
+  const newStatus = classify(task.impact, task.effort, task.isBlocker);
+  await updateTask(task.id, { status: newStatus });
+  await loadTasks();
+
+  const remaining = getUnclassified().length;
+  if (remaining === 0) {
+    pickFocusFromLoaded();
+  } else {
+    render(true);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE: FOCUS
+// ════════════════════════════════════════════════════════════════════════════
+function pickFocusFromLoaded(excludeId) {
+  const pool = UB.tasks.filter(t => t.status && t.status !== 'waiting' && !t.done && t.id !== excludeId);
+  // Priority: urgent blocker > blocker > urgent quick-win > quick-win > defer > noise
+  const score = t => {
+    const urgScore = { urgent: 0, soon: 1, whenever: 2 }[t.urgency] ?? 2;
+    const statusScore = { blocker: 0, 'quick-win': 1, defer: 2, noise: 3 }[t.status] ?? 4;
+    return statusScore * 10 + urgScore;
+  };
+  pool.sort((a, b) => score(a) - score(b));
+  const chosen = pool[0];
+  if (chosen) {
+    UB.focusTask = chosen;
+    UB.timerSec = 300; UB.timerRunning = false; UB.timerDone = false;
+    UB.phase = 'focus';
+    const app = document.getElementById('app');
+    app.innerHTML = focusHTML();
+    bindFocus();
+  } else {
+    UB.phase = 'dump';
+    render();
+  }
+}
+
+async function pickFocus(excludeId) {
+  await loadTasks();
+  pickFocusFromLoaded(excludeId);
+}
+
+function focusHTML() {
+  const t = UB.focusTask;
+  if (!t) return '';
+  const meta    = STATUS_META[t.status] || STATUS_META['quick-win'];
+  const urgMeta = t.urgency ? URGENCY_META[t.urgency] : null;
+  const cat     = t.categoryId ? catById(t.categoryId) : null;
+
+  const pct = (UB.timerSec / 300) * 100;
+  const r = 80, circ = 2 * Math.PI * r;
+  const dashOffset = circ * (1 - pct / 100);
+  const ringColor = UB.timerDone ? '#2DD4A7' : UB.timerRunning ? '#FF6B35' : '#d0cdc6';
+  const timerLabel = UB.timerDone
+    ? '完成'
+    : `${Math.floor(UB.timerSec / 60)}:${String(UB.timerSec % 60).padStart(2,'0')}`;
+
+  return `
+    <div style="text-align:center">
+      <div class="section-head" style="justify-content:center">
+        <span class="section-label">專注</span>
+      </div>
+      <div class="section-line"></div>
+
+      <div style="margin-bottom:8px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap">
+        <span class="tag" style="background:${meta.bg};color:${meta.color}">${meta.label}</span>
+        ${urgMeta ? `<span class="tag" style="background:${urgMeta.bg};color:${urgMeta.color}">${urgMeta.label}</span>` : ''}
+        ${cat ? `<span class="tag" style="background:var(--panel);color:var(--text-3);border:1px solid var(--border)">${cat.emoji} ${escHtml(cat.label)}</span>` : ''}
+      </div>
+
+      <p style="font-size:11px;color:var(--text-3);margin-bottom:32px;letter-spacing:0.08em">現在只做這一件</p>
+
+      <div style="position:relative;width:180px;height:180px;margin:0 auto 32px">
+        <svg width="180" height="180" viewBox="0 0 180 180">
+          <circle cx="90" cy="90" r="${r}" fill="none" stroke="var(--border)" stroke-width="6"/>
+          <circle cx="90" cy="90" r="${r}" fill="none" stroke="${ringColor}" stroke-width="6"
+            stroke-linecap="round"
+            stroke-dasharray="${circ}"
+            stroke-dashoffset="${dashOffset}"
+            transform="rotate(-90 90 90)"
+            class="timer-ring"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span id="timer-label" style="font-size:32px;font-weight:300;color:${UB.timerDone?'#2DD4A7':'var(--text)'};letter-spacing:-0.02em">${timerLabel}</span>
+          <span style="font-size:10px;color:var(--text-3);margin-top:4px">5 分鐘</span>
+        </div>
+      </div>
+
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:20px 24px;margin-bottom:24px;text-align:left">
+        <p style="font-size:15px;color:var(--text);margin:0;line-height:1.5;font-family:'DM Sans',sans-serif">${escHtml(t.text)}</p>
+        <p style="font-size:12px;color:var(--text-3);margin:8px 0 0;line-height:1.5">只做第一步。不用做完。只要開始。</p>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${!UB.timerRunning && !UB.timerDone ? `<button class="btn-primary" id="start-timer-btn">開始 5 分鐘</button>` : ''}
+        ${UB.timerRunning ? `<button class="btn-ghost" id="pause-timer-btn">暫停</button>` : ''}
+        ${UB.timerDone ? `<button class="btn-primary" id="done-btn">✓ 這件事做完了</button>` : ''}
+        <button class="btn-ghost" id="complete-btn">✓ 做完了</button>
+        <button class="btn-ghost" id="skip-btn">換一件</button>
+        <button class="btn-ghost" id="back-dump-btn" style="margin-top:4px">回到清單</button>
+      </div>
+    </div>`;
+}
+
+function bindFocus() {
+  const s = document.getElementById('start-timer-btn');
+  const p = document.getElementById('pause-timer-btn');
+  const d = document.getElementById('done-btn');
+  if (s) s.onclick = startTimer;
+  if (p) p.onclick = pauseTimer;
+  if (d) d.onclick = completeTask;
+  document.getElementById('complete-btn').onclick  = completeTask;
+  document.getElementById('skip-btn').onclick      = skipTask;
+  document.getElementById('back-dump-btn').onclick = () => {
+    clearInterval(UB._interval); UB.timerRunning = false;
+    UB.phase = 'dump'; render();
+  };
+}
+
+function startTimer() {
+  UB.timerRunning = true;
+  const app = document.getElementById('app');
+  app.innerHTML = focusHTML();
+  bindFocus();
+  UB._interval = setInterval(() => {
+    UB.timerSec--;
+    if (UB.timerSec <= 0) {
+      clearInterval(UB._interval);
+      UB.timerRunning = false; UB.timerDone = true; UB.timerSec = 0;
+    }
+    const ring  = document.querySelector('.timer-ring');
+    const label = document.getElementById('timer-label');
+    if (ring) {
+      const circ = 2 * Math.PI * 80;
+      ring.setAttribute('stroke-dashoffset', circ * (1 - UB.timerSec / 300));
+      ring.setAttribute('stroke', UB.timerDone ? '#2DD4A7' : '#FF6B35');
+    }
+    if (label) {
+      label.textContent = UB.timerDone ? '完成' : `${Math.floor(UB.timerSec/60)}:${String(UB.timerSec%60).padStart(2,'0')}`;
+      if (UB.timerDone) label.style.color = '#2DD4A7';
+    }
+    if (UB.timerDone) { const a = document.getElementById('app'); a.innerHTML = focusHTML(); bindFocus(); }
+  }, 1000);
+}
+
+function pauseTimer() {
+  clearInterval(UB._interval);
+  UB.timerRunning = false;
+  const app = document.getElementById('app');
+  app.innerHTML = focusHTML();
+  bindFocus();
+}
+
+async function completeTask() {
+  clearInterval(UB._interval); UB.timerRunning = false;
+  if (UB.focusTask) await deleteTask(UB.focusTask.id);
+  UB.focusTask = null; UB.phase = 'dump';
+  await render();
+}
+
+async function skipTask() {
+  const excludeId = UB.focusTask?.id;
+  if (excludeId) await updateTask(excludeId, { status: 'waiting' });
+  clearInterval(UB._interval); UB.timerRunning = false;
+  await pickFocus(excludeId);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SETTINGS: category management
+// ════════════════════════════════════════════════════════════════════════════
+function openSettings() {
+  document.getElementById('settings-overlay').classList.add('open');
+  renderCatList();
+}
+
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+  render();
+}
+
+// ── Emoji picker ─────────────────────────────────────────────────────────────
+const EMOJIS = [
+  '💼','📊','📝','💡','🎯','📋','📌','💻','📱','🖥️',
+  '🏠','🛒','🧹','🍳','💊','😴','👕','📦','🧺','🔑',
+  '🎨','✏️','🖌️','📸','🎭','🎬','🎵','📚','🖼️','🎪',
+  '✈️','🌍','🚆','🏢','🗺️','🌐','🏙️','🛫','🚀','🌏',
+  '🏃','💪','🧘','🍎','🏥','🔋','⚕️','🧠','❤️','😊',
+  '💰','💳','📅','⏰','🔧','⚙️','⭐','🎁','🔔','✅',
+];
+
+let _emojiTarget = null;
+
+function initEmojiPicker() {
+  const grid = document.getElementById('emoji-grid');
+  if (!grid) return;
+  grid.innerHTML = EMOJIS.map(e =>
+    `<button onclick="pickEmoji('${e}')" title="${e}">${e}</button>`
+  ).join('');
+  document.addEventListener('click', e => {
+    const picker = document.getElementById('emoji-picker');
+    if (picker && !picker.contains(e.target) && !e.target.classList.contains('cat-emoji-btn')) {
+      picker.classList.remove('open');
+    }
+  }, true);
+}
+
+function openEmojiPicker(btn, catId) {
+  _emojiTarget = catId;
+  const picker = document.getElementById('emoji-picker');
+  const rect = btn.getBoundingClientRect();
+  picker.style.top  = (rect.bottom + 6) + 'px';
+  picker.style.left = Math.min(rect.left, window.innerWidth - 270) + 'px';
+  picker.classList.toggle('open');
+}
+
+function pickEmoji(emoji) {
+  const picker = document.getElementById('emoji-picker');
+  picker.classList.remove('open');
+  if (!_emojiTarget) return;
+  const cat = UB.categories.find(c => c.id === _emojiTarget);
+  if (!cat) return;
+  cat.emoji = emoji;
+  saveCategory(cat);
+  renderCatList();
+}
+
+// ── Drag-and-drop sort ────────────────────────────────────────────────────────
+let _dragId = null;
+
+function renderCatList() {
+  const el = document.getElementById('cat-list');
+  el.innerHTML = UB.categories.map((c) => `
+    <div class="cat-row" data-id="${c.id}"
+      draggable="true"
+      ondragstart="onDragStart(event,'${c.id}')"
+      ondragover="onDragOver(event)"
+      ondrop="onDrop(event,'${c.id}')"
+      ondragend="onDragEnd(event)">
+      <span class="cat-drag-handle" title="拖拉排序">⠿</span>
+      <button class="cat-emoji-btn" onclick="openEmojiPicker(this,'${c.id}')">${c.emoji || '📌'}</button>
+      <input class="cat-name-input" value="${escHtml(c.label)}"
+        onchange="renameCat('${c.id}', this.value)">
+      <button class="cat-del-btn" onclick="removeCat('${c.id}')" title="刪除">🗑</button>
+    </div>`).join('');
+}
+
+function onDragStart(e, id) {
+  _dragId = id;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.cat-row').forEach(r => r.classList.remove('drag-over'));
+  e.currentTarget.classList.add('drag-over');
+}
+async function onDrop(e, targetId) {
+  e.preventDefault();
+  if (_dragId === targetId) return;
+  const fromIdx = UB.categories.findIndex(c => c.id === _dragId);
+  const toIdx   = UB.categories.findIndex(c => c.id === targetId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  const [moved] = UB.categories.splice(fromIdx, 1);
+  UB.categories.splice(toIdx, 0, moved);
+  await Promise.all(UB.categories.map((c, i) => saveCategory({ ...c, sort_order: i })));
+  await loadCategories();
+  renderCatList();
+}
+function onDragEnd(e) {
+  _dragId = null;
+  document.querySelectorAll('.cat-row').forEach(r => {
+    r.classList.remove('dragging', 'drag-over');
+  });
+}
+
+async function renameCat(id, val) {
+  const cat = UB.categories.find(c => c.id === id);
+  if (!cat || !val.trim()) return;
+  cat.label = val.trim();
+  await saveCategory(cat);
+}
+
+async function moveCat(id, dir) {
+  const idx = UB.categories.findIndex(c => c.id === id);
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= UB.categories.length) return;
+  [UB.categories[idx], UB.categories[newIdx]] = [UB.categories[newIdx], UB.categories[idx]];
+  await Promise.all(UB.categories.map((c, i) => saveCategory({ ...c, sort_order: i })));
+  await loadCategories();
+  renderCatList();
+}
+
+async function removeCat(id) {
+  if (!confirm('刪除這個分類？該分類的任務會變成未分類。')) return;
+  await deleteCategory(id);
+  await loadCategories();
+  renderCatList();
+}
+
+async function addCategory() {
+  const emojiEl = document.getElementById('new-cat-emoji');
+  const nameEl  = document.getElementById('new-cat-name');
+  const label   = nameEl.value.trim();
+  if (!label) return;
+  const emoji = emojiEl.value.trim() || '📌';
+  const newCat = { label, emoji, sort_order: UB.categories.length };
+  const saved = await saveCategory(newCat);
+  nameEl.value = ''; emojiEl.value = '';
+  await loadCategories();
+  renderCatList();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+initEmojiPicker();
+render();
+</script>
+</body>
+</html>
