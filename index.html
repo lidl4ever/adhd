@@ -294,7 +294,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <span class="gate-icon">🌿</span>
       <div><div class="gate-label">今天狀態不好 — 小步前進</div><div class="gate-sub">只做一件最小的事就算贏</div></div>
     </button>
-    <button class="gate-btn" onclick="startDay('unblock')">
+    <button class="gate-btn" onclick="window.location.href='unblock.html'">
       <span class="gate-icon">🧠</span>
       <div><div class="gate-label">腦袋清空模式</div><div class="gate-sub">倒出所有事 → 分類 → 選一件現在做</div></div>
     </button>
@@ -341,13 +341,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
 
-    <!-- ADHD Unblock 入口 — 第一層，Focus Zone 正下方 -->
-    <button onclick="openUnblock()" style="
+    <!-- ADHD Unblock 入口 — 獨立頁面 -->
+    <a href="unblock.html" style="
       width:100%; padding:13px 20px; border-radius:12px; margin-bottom:14px;
       border:1px solid var(--border); background:var(--bg-panel);
       color:var(--text); font-size:13px; cursor:pointer; text-align:left;
       display:flex; align-items:center; gap:12px; transition:all 0.15s;
-      font-family:inherit;
+      font-family:inherit; text-decoration:none;
     " onmouseover="this.style.borderColor='var(--border-2)';this.style.background='var(--bg-input)'"
        onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg-panel)'">
       <span style="font-size:18px;">🧠</span>
@@ -356,7 +356,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <span style="font-size:11px;color:var(--text-3);margin-left:10px;">倒出所有事 → 分類 → 選一件現在做</span>
       </div>
       <span style="margin-left:auto;color:var(--text-3);font-size:13px;">→</span>
-    </button>
+    </a>
 
     <!-- Stats -->
     <div class="grid-3">
@@ -516,33 +516,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     ADHD UNBLOCK 全螢幕疊層
-════════════════════════════════════════════════════════════ -->
-<div id="unblock-overlay" style="
-  display:none; position:fixed; inset:0; z-index:2000;
-  background:#f7f6f3; color:#1a1917;
-  font-family:'DM Mono','Courier New',monospace;
-  overflow-y:auto;
-">
-  <!-- 關閉按鈕 -->
-  <button onclick="closeUnblock()" style="
-    position:fixed; top:20px; right:24px; z-index:10;
-    background:transparent; border:1px solid #e5e3de;
-    color:#6b6860; font-size:12px; padding:7px 14px;
-    border-radius:6px; cursor:pointer; font-family:'DM Mono',monospace;
-    transition:all 0.15s;
-  " onmouseover="this.style.borderColor='#d0cdc6';this.style.color='#1a1917'"
-     onmouseout="this.style.borderColor='#e5e3de';this.style.color='#6b6860'">
-    ✕ 關閉
-  </button>
-
-  <div id="unblock-app" style="
-    min-height:100vh; display:flex; flex-direction:column;
-    align-items:center; justify-content:flex-start;
-    padding:48px 24px;
-  "></div>
-</div>
 
 <script>
 // ─── STORAGE HELPERS ────────────────────────────────────────────────────────
@@ -601,11 +574,7 @@ const FOCUS_TASKS = {
   rest:  '打開 Kanban，只看一張卡片。看完算完成。'
 };
 function startDay(mode) {
-  if (mode === 'unblock') {
-    showMain();
-    openUnblock();
-    return;
-  }
+  if (mode === 'unblock') { window.location.href = 'unblock.html'; return; }
   document.getElementById('focus-context').textContent = FOCUS_LABELS[mode];
   document.getElementById('focus-input').value = FOCUS_TASKS[mode];
   save('today-mode', mode);
@@ -949,447 +918,9 @@ function setTip(i) { tipIdx = i; renderTip(); }
 setInterval(() => { tipIdx = (tipIdx+1) % TIPS.length; renderTip(); }, 30000);
 renderTip();
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ADHD UNBLOCK ENGINE  (Supabase 跨裝置同步)
-// ═══════════════════════════════════════════════════════════════════════════
-const UB = {
-  phase: 'dump',      // dump | triage | focus
-  tasks: [],
-  triageIdx: 0,
-  focusTask: null,
-  timerSec: 300,
-  timerRunning: false,
-  timerDone: false,
-  _interval: null,
-  loading: false,
-};
 
-const EFFORT_LABELS = ['很簡單', '有點難', '很難'];
-const IMPACT_LABELS = ['沒什麼用', '有些用', '很有用'];
-const STATUS_META = {
-  blocker:    { label: '解鎖任務', color: '#FF6B35', bg: 'rgba(255,107,53,0.12)' },
-  'quick-win':{ label: '立即可做', color: '#2DD4A7', bg: 'rgba(45,212,167,0.12)' },
-  defer:      { label: '延後處理', color: '#A78BFA', bg: 'rgba(167,139,250,0.12)' },
-  noise:      { label: '低優先',   color: '#6B7280', bg: 'rgba(107,114,128,0.08)' },
-  waiting:    { label: '等待中',   color: '#FBBF24', bg: 'rgba(251,191,36,0.12)' },
-};
 
-function ubClassify(impact, effort, isBlocker) {
-  if (isBlocker) return 'blocker';
-  if (impact === 2 && effort <= 1) return 'quick-win';
-  if (impact === 2 && effort === 2) return 'defer';
-  if (impact <= 1) return 'noise';
-  return 'quick-win';
-}
 
-async function openUnblock() {
-  document.getElementById('unblock-overlay').style.display = 'block';
-  document.body.style.overflow = 'hidden';
-  UB.phase = 'dump';
-  await ubRender();
-}
-function closeUnblock() {
-  document.getElementById('unblock-overlay').style.display = 'none';
-  document.body.style.overflow = '';
-  clearInterval(UB._interval);
-  UB.timerRunning = false;
-}
-
-// ── Supabase 同步 ──
-async function ubSave() {
-  // 已由各操作函數直接寫入 Supabase，此函數保留供相容性
-}
-
-async function ubLoad() {
-  const { data, error } = await supa
-    .from('unblock_items')
-    .select('*')
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true });
-  if (error) { console.error('ubLoad error:', error); return; }
-  // 將 Supabase 資料轉換成 UB.tasks 格式
-  UB.tasks = (data || []).map(r => ({
-    _id: r.id,           // Supabase uuid
-    id: r.id,            // 統一使用 uuid 作為 id
-    text: r.text,
-    impact: r.impact,
-    effort: r.effort,
-    isBlocker: r.is_blocker,
-    status: r.phase === 'dump' ? null : r.phase,
-    done: r.done,
-  }));
-}
-
-async function ubSaveTask(task) {
-  // 新增一筆到 Supabase
-  const { data, error } = await supa.from('unblock_items').insert({
-    text: task.text,
-    phase: 'dump',
-    impact: task.impact,
-    effort: task.effort,
-    is_blocker: task.isBlocker || false,
-    done: false,
-    sort_order: UB.tasks.length,
-  }).select().single();
-  if (error) { console.error('ubSaveTask error:', error); return null; }
-  return data;
-}
-
-async function ubUpdateTask(id, fields) {
-  const update = {};
-  if ('impact' in fields)    update.impact     = fields.impact;
-  if ('effort' in fields)    update.effort     = fields.effort;
-  if ('isBlocker' in fields) update.is_blocker = fields.isBlocker;
-  if ('status' in fields)    update.phase      = fields.status === null ? 'dump' : fields.status;
-  if ('done' in fields)      update.done       = fields.done;
-  const { error } = await supa.from('unblock_items').update(update).eq('id', id);
-  if (error) console.error('ubUpdateTask error:', error);
-}
-
-async function ubDeleteTask(id) {
-  const { error } = await supa.from('unblock_items').delete().eq('id', id);
-  if (error) console.error('ubDeleteTask error:', error);
-}
-
-// ── Render dispatcher ──
-async function ubRender() {
-  if (UB.loading) return;
-  UB.loading = true;
-  await ubLoad();
-  UB.loading = false;
-  const app = document.getElementById('unblock-app');
-  if (!app) return;
-  if (UB.phase === 'dump')   { app.innerHTML = ubDumpHTML(); ubBindDump(); }
-  if (UB.phase === 'triage') { app.innerHTML = ubTriageHTML(); ubBindTriage(); }
-  if (UB.phase === 'focus')  { app.innerHTML = ubFocusHTML(); ubBindFocus(); }
-}
-
-// ── Shared styles injected once ──
-(function injectUBStyles() {
-  if (document.getElementById('ub-styles')) return;
-  const s = document.createElement('style');
-  s.id = 'ub-styles';
-  s.textContent = `
-    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;600&display=swap');
-    #unblock-app ::placeholder { color: #b0aea8; }
-    .ub-btn-primary {
-      background:#1a1917; color:#f7f6f3; border:none; padding:12px 28px;
-      border-radius:6px; font-family:'DM Mono',monospace; font-size:13px;
-      font-weight:500; cursor:pointer; transition:all 0.15s; letter-spacing:0.04em;
-      width:100%;
-    }
-    .ub-btn-primary:hover { background:#333; transform:translateY(-1px); }
-    .ub-btn-primary:disabled { opacity:0.3; cursor:not-allowed; transform:none; }
-    .ub-btn-ghost {
-      background:transparent; color:#6b6860; border:1px solid #e5e3de;
-      padding:10px 20px; border-radius:6px; font-family:'DM Mono',monospace;
-      font-size:12px; cursor:pointer; transition:all 0.15s; width:100%;
-    }
-    .ub-btn-ghost:hover { border-color:#d0cdc6; color:#1a1917; }
-    .ub-task-pill {
-      display:flex; align-items:center; gap:8px; padding:10px 14px;
-      background:#f0efec; border-radius:6px; border:1px solid #e5e3de;
-      font-size:13px; color:#1a1917;
-    }
-    .ub-choice {
-      flex:1; padding:14px 8px; border-radius:8px; border:1px solid #e5e3de;
-      background:#f0efec; color:#6b6860; font-family:'DM Mono',monospace;
-      font-size:12px; cursor:pointer; transition:all 0.15s; text-align:center;
-    }
-    .ub-choice:hover { border-color:#d0cdc6; color:#1a1917; background:#e8e6e1; }
-    .ub-choice.sel-green { border-color:#2DD4A7; color:#0d9e7a; background:rgba(45,212,167,0.1); }
-    .ub-choice.sel-warm  { border-color:#FF6B35; color:#d4500f; background:rgba(255,107,53,0.1); }
-    .ub-tag { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:500; }
-    .ub-header-line { height:1px; background:linear-gradient(90deg,#e5e3de 0%,transparent 100%); margin-bottom:40px; }
-    .ub-blocker-btn { width:100%; padding:11px; border-radius:8px; margin-bottom:20px; font-family:'DM Mono',monospace; font-size:12px; cursor:pointer; transition:all 0.15s; }
-    .ub-timer-ring { transition:stroke-dashoffset 1s linear; }
-  `;
-  document.head.appendChild(s);
-})();
-
-// ─── PHASE: DUMP ──────────────────────────────────────────────────────────────
-function ubDumpHTML() {
-  const taskRows = UB.tasks.map((t,i) => {
-    const meta = t.status ? STATUS_META[t.status] : null;
-    const tag = meta ? `<span class="ub-tag" style="background:${meta.bg};color:${meta.color}">${meta.label}</span>` : '';
-    return `<div class="ub-task-pill">
-      <span style="flex:1">${escHtml(t.text)}</span>${tag}
-      <button onclick="ubRemoveTask('${t.id}')" style="background:none;border:none;color:#3D3B4D;cursor:pointer;font-size:16px;padding:0 4px">×</button>
-    </div>`;
-  }).join('');
-
-  const unclassified = UB.tasks.filter(t => t.status === null).length;
-  const actionBtn = UB.tasks.length === 0 ? '' :
-    unclassified > 0
-      ? `<button class="ub-btn-primary" id="ub-triage-btn">開始分類 (${unclassified} 件) →</button>`
-      : `<button class="ub-btn-primary" id="ub-triage-btn">選出今天的任務 →</button>`;
-
-  return `
-    <div style="width:100%;max-width:520px">
-      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
-        <span style="font-size:11px;color:#a09e9a;letter-spacing:0.12em;text-transform:uppercase">ADHD UNBLOCK</span>
-        ${UB.tasks.length > 0 ? `<span style="font-size:11px;color:#a09e9a">${UB.tasks.length} 件事</span>` : ''}
-      </div>
-      <div class="ub-header-line"></div>
-      <p style="font-size:13px;color:#6b6860;margin-bottom:20px;line-height:1.7">
-        把腦袋裡所有還沒做的事倒出來。<br>不用整理，不用排序，一行一件事。
-      </p>
-      <textarea id="ub-input" placeholder="買廚房層架&#10;收沙發上的衣服&#10;智慧燈泡還沒配對好..." style="
-        width:100%;min-height:140px;background:#f0efec;border:1px solid #e5e3de;
-        border-radius:8px;padding:16px;color:#1a1917;font-family:'DM Mono',monospace;
-        font-size:13px;resize:vertical;outline:none;line-height:1.8;
-      "></textarea>
-      <div style="display:flex;gap:8px;margin-top:8px;margin-bottom:${UB.tasks.length > 0 ? '16px' : '0'}">
-        <button class="ub-btn-primary" id="ub-add-btn">加入清單</button>
-      </div>
-      ${UB.tasks.length > 0 ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">${taskRows}</div>` : ''}
-      ${actionBtn}
-    </div>`;
-}
-function ubBindDump() {
-  document.getElementById('ub-add-btn').onclick = ubAddTasks;
-  document.getElementById('ub-input').onkeydown = e => { if (e.key === 'Enter' && e.metaKey) ubAddTasks(); };
-  const tb = document.getElementById('ub-triage-btn');
-  if (tb) tb.onclick = ubStartTriage;
-}
-async function ubAddTasks() {
-  const input = document.getElementById('ub-input');
-  const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
-  if (lines.length === 0) return;
-  input.value = '';
-  // 批次插入
-  const rows = lines.map((text, i) => ({
-    text,
-    phase: 'dump',
-    impact: null,
-    effort: null,
-    is_blocker: false,
-    done: false,
-    sort_order: (UB.tasks.length || 0) + i,
-  }));
-  const { error } = await supa.from('unblock_items').insert(rows);
-  if (error) { console.error('ubAddTasks error:', error); return; }
-  ubRender();
-}
-async function ubRemoveTask(id) {
-  await ubDeleteTask(id);
-  ubRender();
-}
-
-// ─── PHASE: TRIAGE ────────────────────────────────────────────────────────────
-function ubGetUnclassified() { return UB.tasks.filter(t => t.status === null); }
-function ubStartTriage() {
-  const unc = ubGetUnclassified();
-  if (unc.length === 0) { ubPickFocus(); return; }
-  UB.triageIdx = 0;
-  UB.phase = 'triage';
-  ubRender();
-}
-
-function ubTriageHTML() {
-  const unc = ubGetUnclassified();
-  const task = unc[UB.triageIdx];
-  if (!task) return `<div style="color:#6B6880;max-width:520px">分類完成！</div>`;
-
-  const impactBtns = IMPACT_LABELS.map((l,i) =>
-    `<button class="ub-choice ${task.impact===i?'sel-green':''}" data-field="impact" data-val="${i}">${l}</button>`
-  ).join('');
-  const effortBtns = EFFORT_LABELS.map((l,i) =>
-    `<button class="ub-choice ${task.effort===i?'sel-warm':''}" data-field="effort" data-val="${i}">${l}</button>`
-  ).join('');
-  const blockerActive = task.isBlocker;
-
-  return `
-    <div style="width:100%;max-width:520px">
-      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
-        <span style="font-size:11px;color:#a09e9a;letter-spacing:0.12em;text-transform:uppercase">ADHD UNBLOCK</span>
-        <span style="font-size:11px;color:#a09e9a">還有 ${unc.length} 件 · 快速回答就好</span>
-      </div>
-      <div class="ub-header-line"></div>
-      <div style="background:#f0efec;border:1px solid #e5e3de;border-radius:10px;padding:24px;margin-bottom:20px">
-        <p style="font-size:16px;color:#1a1917;margin:0;line-height:1.5;font-family:'DM Sans',sans-serif">${escHtml(task.text)}</p>
-      </div>
-      <button id="ub-blocker-btn" class="ub-blocker-btn" style="
-        border:1px solid ${blockerActive ? '#FF6B35' : '#1E1C2A'};
-        background:${blockerActive ? 'rgba(255,107,53,0.1)' : 'transparent'};
-        color:${blockerActive ? '#FF6B35' : '#4A4760'};
-      ">${blockerActive ? '✓ 這是解鎖任務（做完會解開其他事）' : '這件事做完會解鎖其他任務？'}</button>
-      <div style="margin-bottom:16px">
-        <p style="font-size:11px;color:#6B6880;margin-bottom:8px;letter-spacing:0.08em">做這件事有幫助嗎？</p>
-        <div style="display:flex;gap:6px">${impactBtns}</div>
-      </div>
-      <div style="margin-bottom:24px">
-        <p style="font-size:11px;color:#6B6880;margin-bottom:8px;letter-spacing:0.08em">做起來難嗎？</p>
-        <div style="display:flex;gap:6px">${effortBtns}</div>
-      </div>
-      <button id="ub-confirm-btn" class="ub-btn-primary" ${(task.impact===null||task.effort===null)?'disabled':''}>下一件 →</button>
-      <div style="margin-top:8px"><button class="ub-btn-ghost" id="ub-back-btn">← 回清單</button></div>
-    </div>`;
-}
-function ubBindTriage() {
-  const unc = ubGetUnclassified();
-  const task = unc[UB.triageIdx];
-  if (!task) return;
-
-  document.getElementById('ub-blocker-btn').onclick = async () => {
-    const newVal = !task.isBlocker;
-    await ubUpdateTask(task.id, { isBlocker: newVal });
-    ubRender();
-  };
-  document.querySelectorAll('[data-field]').forEach(btn => {
-    btn.onclick = async () => {
-      await ubUpdateTask(task.id, { [btn.dataset.field]: parseInt(btn.dataset.val) });
-      ubRender();
-    };
-  });
-  document.getElementById('ub-confirm-btn').onclick = ubConfirmTriage;
-  document.getElementById('ub-back-btn').onclick = () => { UB.phase = 'dump'; ubRender(); };
-}
-async function ubConfirmTriage() {
-  const unc = ubGetUnclassified();
-  const task = unc[UB.triageIdx];
-  if (!task || task.impact === null || task.effort === null) return;
-  const newStatus = ubClassify(task.impact, task.effort, task.isBlocker);
-  await ubUpdateTask(task.id, { status: newStatus });
-  // Re-load to check remaining
-  await ubLoad();
-  const remaining = ubGetUnclassified().length;
-  if (remaining === 0) {
-    // Reload focusable list
-    const app = document.getElementById('unblock-app');
-    ubPickFocusFromLoaded();
-  } else {
-    ubRender();
-  }
-}
-
-// ─── PHASE: FOCUS ─────────────────────────────────────────────────────────────
-// 使用已載入的 UB.tasks（不重新 fetch）
-function ubPickFocusFromLoaded(excludeId) {
-  const pool = UB.tasks.filter(t => t.status && t.status !== 'waiting' && !t.done && t.id !== excludeId);
-  const blocker  = pool.find(t => t.status === 'blocker');
-  const quickWin = pool.find(t => t.status === 'quick-win');
-  const chosen = blocker || quickWin || pool[0];
-  if (chosen) {
-    UB.focusTask = chosen;
-    UB.timerSec = 300; UB.timerRunning = false; UB.timerDone = false;
-    UB.phase = 'focus';
-    const app = document.getElementById('unblock-app');
-    if (app) { app.innerHTML = ubFocusHTML(); ubBindFocus(); }
-  } else {
-    UB.phase = 'dump';
-    ubRender();
-  }
-}
-
-async function ubPickFocus(excludeId) {
-  await ubLoad();
-  ubPickFocusFromLoaded(excludeId);
-}
-
-function ubFocusHTML() {
-  const t = UB.focusTask;
-  if (!t) return '';
-  const meta = STATUS_META[t.status] || STATUS_META['quick-win'];
-  const pct = (UB.timerSec / 300) * 100;
-  const r = 80, circ = 2 * Math.PI * r;
-  const dashOffset = circ * (1 - pct / 100);
-  const ringColor = UB.timerDone ? '#2DD4A7' : UB.timerRunning ? '#FF6B35' : '#2A2836';
-  const timerLabel = UB.timerDone ? '完成' : `${Math.floor(UB.timerSec/60)}:${String(UB.timerSec%60).padStart(2,'0')}`;
-
-  return `
-    <div style="width:100%;max-width:520px;text-align:center">
-      <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px;justify-content:center">
-        <span style="font-size:11px;color:#a09e9a;letter-spacing:0.12em;text-transform:uppercase">ADHD UNBLOCK</span>
-      </div>
-      <div class="ub-header-line"></div>
-      <div style="margin-bottom:8px">
-        <span class="ub-tag" style="background:${meta.bg};color:${meta.color}">${meta.label}</span>
-      </div>
-      <p style="font-size:11px;color:#a09e9a;margin-bottom:32px;letter-spacing:0.08em">現在只做這一件</p>
-      <div style="position:relative;width:180px;height:180px;margin:0 auto 32px">
-        <svg width="180" height="180" viewBox="0 0 180 180">
-          <circle cx="90" cy="90" r="${r}" fill="none" stroke="#e5e3de" stroke-width="6"/>
-          <circle cx="90" cy="90" r="${r}" fill="none" stroke="${ringColor}" stroke-width="6"
-            stroke-linecap="round"
-            stroke-dasharray="${circ}"
-            stroke-dashoffset="${dashOffset}"
-            transform="rotate(-90 90 90)"
-            class="ub-timer-ring"/>
-        </svg>
-        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
-          <span style="font-size:32px;font-weight:300;color:${UB.timerDone?'#2DD4A7':'#E8E6F0'};letter-spacing:-0.02em">${timerLabel}</span>
-          <span style="font-size:10px;color:#3D3B4D;margin-top:4px">5 分鐘</span>
-        </div>
-      </div>
-      <div style="background:#f0efec;border:1px solid #e5e3de;border-radius:10px;padding:20px 24px;margin-bottom:24px;text-align:left">
-        <p style="font-size:15px;color:#1a1917;margin:0;line-height:1.5;font-family:'DM Sans',sans-serif">${escHtml(t.text)}</p>
-        <p style="font-size:12px;color:#a09e9a;margin:8px 0 0;line-height:1.5">只做第一步。不用做完。只要開始。</p>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        ${!UB.timerRunning && !UB.timerDone ? `<button class="ub-btn-primary" id="ub-start-timer">開始 5 分鐘</button>` : ''}
-        ${UB.timerRunning ? `<button class="ub-btn-ghost" id="ub-pause-timer">暫停</button>` : ''}
-        ${UB.timerDone ? `<button class="ub-btn-primary" id="ub-done-btn">✓ 這件事做完了</button>` : ''}
-        <button class="ub-btn-ghost" id="ub-complete-btn">✓ 做完了</button>
-        <button class="ub-btn-ghost" id="ub-skip-btn">換一件</button>
-        <button class="ub-btn-ghost" id="ub-back-dump" style="margin-top:4px">回到清單</button>
-      </div>
-    </div>`;
-}
-function ubBindFocus() {
-  const startBtn = document.getElementById('ub-start-timer');
-  const pauseBtn = document.getElementById('ub-pause-timer');
-  const doneBtn  = document.getElementById('ub-done-btn');
-  if (startBtn) startBtn.onclick = ubStartTimer;
-  if (pauseBtn) pauseBtn.onclick = ubPauseTimer;
-  if (doneBtn)  doneBtn.onclick  = ubCompleteTask;
-  document.getElementById('ub-complete-btn').onclick = ubCompleteTask;
-  document.getElementById('ub-skip-btn').onclick     = ubSkipTask;
-  document.getElementById('ub-back-dump').onclick    = () => { clearInterval(UB._interval); UB.timerRunning=false; UB.phase='dump'; ubRender(); };
-}
-function ubStartTimer() {
-  UB.timerRunning = true;
-  ubRender();
-  UB._interval = setInterval(() => {
-    UB.timerSec--;
-    if (UB.timerSec <= 0) {
-      clearInterval(UB._interval); UB.timerRunning=false; UB.timerDone=true; UB.timerSec=0;
-    }
-    // Update ring and timer without full re-render
-    const ring = document.querySelector('.ub-timer-ring');
-    const label = document.querySelector('#unblock-app span[style*="32px"]');
-    if (ring) {
-      const pct = (UB.timerSec / 300) * 100;
-      const circ = 2 * Math.PI * 80;
-      ring.setAttribute('stroke-dashoffset', circ * (1 - pct / 100));
-      ring.setAttribute('stroke', UB.timerDone ? '#2DD4A7' : '#FF6B35');
-    }
-    if (label) label.textContent = UB.timerDone ? '完成' : `${Math.floor(UB.timerSec/60)}:${String(UB.timerSec%60).padStart(2,'0')}`;
-    if (UB.timerDone) { ubRender(); ubBindFocus(); }
-  }, 1000);
-}
-function ubPauseTimer() {
-  clearInterval(UB._interval);
-  UB.timerRunning = false;
-  ubRender();
-}
-async function ubCompleteTask() {
-  clearInterval(UB._interval);
-  UB.timerRunning = false;
-  if (UB.focusTask) {
-    await ubDeleteTask(UB.focusTask.id);
-  }
-  UB.focusTask = null; UB.phase = 'dump';
-  ubRender();
-}
-async function ubSkipTask() {
-  const excludeId = UB.focusTask ? UB.focusTask.id : null;
-  if (excludeId) {
-    await ubUpdateTask(excludeId, { status: 'waiting' });
-  }
-  clearInterval(UB._interval); UB.timerRunning = false;
-  await ubPickFocus(excludeId);
-}
 </script>
 </body>
 </html>
