@@ -96,19 +96,104 @@ body {
 }
 .btn-ghost:hover { border-color: var(--border-2); color: var(--text); }
 
+/* ── View tabs ── */
+.view-tabs {
+  display: flex; gap: 0; margin-left: auto;
+}
+.view-tab {
+  padding: 6px 14px; font-family: 'DM Mono', monospace;
+  font-size: 11px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-3);
+  cursor: pointer; transition: all 0.15s; letter-spacing: 0.04em;
+}
+.view-tab:first-child { border-radius: 6px 0 0 6px; }
+.view-tab:last-child  { border-radius: 0 6px 6px 0; border-left: none; }
+.view-tab.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
 /* ── Task pill ── */
 .task-pill {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 14px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
-  font-size: 13px; color: var(--text);
+  font-size: 13px; color: var(--text); transition: opacity 0.3s;
 }
+.task-pill.done-pill { opacity: 0.45; }
+.task-pill-done {
+  background: none; border: none; color: var(--text-3);
+  cursor: pointer; font-size: 15px; padding: 0 2px;
+  flex-shrink: 0; transition: color 0.15s; line-height: 1;
+}
+.task-pill-done:hover { color: var(--green); }
 .task-pill-del {
   background: none; border: none; color: var(--text-3);
   cursor: pointer; font-size: 16px; padding: 0 4px;
-  margin-left: auto; flex-shrink: 0;
+  flex-shrink: 0; transition: color 0.15s;
 }
 .task-pill-del:hover { color: var(--text); }
+
+/* ── Completed section toggle ── */
+.done-toggle {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--text-3); letter-spacing: 0.08em;
+  text-transform: uppercase; margin: 20px 0 8px;
+  cursor: pointer; user-select: none; background: none;
+  border: none; padding: 0; font-family: 'DM Mono', monospace;
+  transition: color 0.15s;
+}
+.done-toggle:hover { color: var(--text-2); }
+.done-toggle-line { flex: 1; height: 1px; background: var(--border); }
+
+/* ── Kanban ── */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+@media (max-width: 900px) { .kanban-board { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .kanban-board { grid-template-columns: 1fr; } }
+
+.kanban-col {
+  display: flex; flex-direction: column; gap: 0;
+  min-height: 200px;
+}
+.kanban-col-header {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
+  text-transform: uppercase; margin-bottom: 10px; color: var(--text-3);
+}
+.kanban-col-count {
+  font-size: 10px; padding: 2px 7px; border-radius: 10px;
+  background: var(--panel); color: var(--text-3); margin-left: auto;
+}
+.kanban-card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 14px; margin-bottom: 8px;
+  cursor: default; transition: box-shadow 0.15s, border-color 0.15s;
+  position: relative;
+}
+.kanban-card:hover { border-color: var(--border-2); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.kanban-card-title { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 8px; }
+.kanban-card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.kanban-card-actions {
+  display: flex; gap: 4px; margin-top: 10px; opacity: 0;
+  transition: opacity 0.15s;
+}
+.kanban-card:hover .kanban-card-actions { opacity: 1; }
+.kanban-action-btn {
+  font-size: 11px; padding: 4px 8px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--text-3); cursor: pointer; font-family: 'DM Mono', monospace;
+  transition: all 0.15s;
+}
+.kanban-action-btn:hover { border-color: var(--border-2); color: var(--text); }
+.kanban-action-btn.complete { color: var(--green); border-color: rgba(45,212,167,0.3); }
+.kanban-action-btn.complete:hover { background: rgba(45,212,167,0.1); border-color: var(--green); }
+.kanban-empty {
+  font-size: 12px; color: var(--text-3); text-align: center;
+  padding: 24px 0; border: 1px dashed var(--border); border-radius: 8px;
+  opacity: 0.6;
+}
 
 /* ── Choice buttons ── */
 .choice-row { display: flex; gap: 6px; }
@@ -256,10 +341,14 @@ body {
 <div class="topbar">
   <div class="topbar-title">ADHD Unblock</div>
   <div class="topbar-phase" id="topbar-phase"></div>
+  <div class="view-tabs" id="view-tabs">
+    <button class="view-tab active" onclick="switchView('list')">清單</button>
+    <button class="view-tab" onclick="switchView('kanban')">看板</button>
+  </div>
   <button onclick="openSettings()" style="
     background:none;border:1px solid var(--border);border-radius:6px;
     padding:6px 12px;font-family:'DM Mono',monospace;font-size:12px;
-    color:var(--text-2);cursor:pointer;transition:all 0.15s;margin-left:auto;
+    color:var(--text-2);cursor:pointer;transition:all 0.15s;
   " onmouseover="this.style.borderColor='var(--border-2)';this.style.color='var(--text)'"
      onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-2)'">
     ⚙ 分類管理
@@ -304,7 +393,26 @@ body {
 // ── Supabase ────────────────────────────────────────────────────────────────
 const SUPA_URL = 'https://ijzjwknrhjehskhrvvzr.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlqemp3a25yaGplaHNraHJ2dnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMzY2MjQsImV4cCI6MjA5MzcxMjYyNH0.uCaE_oXUZkLWiZa4-xjLz5Q7Q99mr3D9LTx_TFraY3k';
-const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+let supa;
+try {
+  supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+} catch(e) {
+  console.error('Supabase init failed:', e);
+  document.getElementById('app').innerHTML = `
+    <div style="padding:40px 0;text-align:center;color:var(--text-3)">
+      <div style="font-size:32px;margin-bottom:16px">⚠️</div>
+      <div style="font-size:14px;color:var(--text-2);margin-bottom:8px">無法連接資料庫</div>
+      <div style="font-size:12px;line-height:1.7">
+        請透過 GitHub Pages 開啟此頁面：<br>
+        <a href="https://lidl4ever.github.io/adhd/unblock.html"
+           style="color:var(--accent);text-decoration:none">
+          lidl4ever.github.io/adhd/unblock.html
+        </a>
+      </div>
+    </div>`;
+  throw e; // 停止後續執行
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function escHtml(s) {
@@ -314,6 +422,7 @@ function escHtml(s) {
 // ── State ───────────────────────────────────────────────────────────────────
 const UB = {
   phase: 'dump',
+  view: 'list',      // 'list' | 'kanban'
   tasks: [],
   categories: [],
   triageIdx: 0,
@@ -324,6 +433,7 @@ const UB = {
   timerDone: false,
   _interval: null,
   loading: false,
+  showDone: false,     // 是否展開已完成區塊
 };
 
 const STATUS_META = {
@@ -442,6 +552,15 @@ function classify(impact, effort, isBlocker) {
   return 'quick-win';
 }
 
+// ── View switcher ─────────────────────────────────────────────────────────────
+function switchView(v) {
+  UB.view = v;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  const idx = v === 'list' ? 0 : 1;
+  document.querySelectorAll('.view-tab')[idx]?.classList.add('active');
+  render(true);
+}
+
 // ── Render dispatcher ─────────────────────────────────────────────────────────
 async function render(skipLoad) {
   if (UB.loading) return;
@@ -452,7 +571,16 @@ async function render(skipLoad) {
   UB.loading = false;
 
   const phases = { dump: 'Dump', triage: 'Triage', focus: 'Focus' };
-  document.getElementById('topbar-phase').textContent = phases[UB.phase] || '';
+  document.getElementById('topbar-phase').textContent =
+    UB.view === 'kanban' ? 'Kanban' : (phases[UB.phase] || '');
+
+  // 看板 view 不受 phase 控制
+  if (UB.view === 'kanban') {
+    const app = document.getElementById('app');
+    app.innerHTML = kanbanHTML();
+    bindKanban();
+    return;
+  }
 
   const app = document.getElementById('app');
   if (UB.phase === 'dump')   { app.innerHTML = dumpHTML();   bindDump(); }
@@ -469,8 +597,9 @@ function catById(id) {
 
 function dumpHTML() {
   const blockers   = UB.tasks.filter(t => t.status === 'blocker' && !t.done);
-  const triageable = UB.tasks.filter(t => t.status === null);
+  const triageable = UB.tasks.filter(t => t.status === null && !t.done);
   const classified = UB.tasks.filter(t => t.status !== null && t.status !== 'blocker' && !t.done);
+  const doneTasks  = UB.tasks.filter(t => t.done);
 
   // Group classified tasks by category
   const byCategory = {};
@@ -534,9 +663,25 @@ function dumpHTML() {
   }
 
   const total = UB.tasks.filter(t => !t.done).length;
-  const actionBtn = UB.tasks.length === 0 ? '' : triageable.length > 0
+  const actionBtn = UB.tasks.filter(t=>!t.done).length === 0 ? '' : triageable.length > 0
     ? `<button class="btn-primary" id="triage-btn" style="margin-top:20px">開始分類 (${triageable.length} 件) →</button>`
     : `<button class="btn-primary" id="triage-btn" style="margin-top:20px">選出今天要做的 →</button>`;
+
+  // Done section
+  let doneHTML = '';
+  if (doneTasks.length > 0) {
+    const arrow = UB.showDone ? '▾' : '▸';
+    const doneList = UB.showDone
+      ? `<div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">${doneTasks.map(t => pillHTML(t, true)).join('')}</div>`
+      : '';
+    doneHTML = `
+      <button class="done-toggle" id="done-toggle-btn">
+        ${arrow} 已完成
+        <span class="group-count" style="text-transform:none;letter-spacing:0">${doneTasks.length} 件</span>
+        <div class="done-toggle-line"></div>
+      </button>
+      ${doneList}`;
+  }
 
   return `
     <div class="section-head">
@@ -564,10 +709,11 @@ function dumpHTML() {
     ${blockersHTML}
     ${groupsHTML}
     ${dumpListHTML}
-    ${actionBtn}`;
+    ${actionBtn}
+    ${doneHTML}`;
 }
 
-function pillHTML(t) {
+function pillHTML(t, isDoneView = false) {
   const meta     = t.status ? STATUS_META[t.status] : null;
   const urgMeta  = t.urgency ? URGENCY_META[t.urgency] : null;
   const cat      = t.categoryId ? catById(t.categoryId) : null;
@@ -579,10 +725,22 @@ function pillHTML(t) {
   const catTag = cat
     ? `<span class="tag" style="background:var(--panel);color:var(--text-3);border:1px solid var(--border);flex-shrink:0">${cat.emoji} ${escHtml(cat.label)}</span>` : '';
 
-  return `<div class="task-pill">
+  if (isDoneView) {
+    // 已完成：顯示刪除按鈕（永久移除）
+    return `<div class="task-pill done-pill">
+      <span style="flex:1;text-decoration:line-through;color:var(--text-3)">${escHtml(t.text)}</span>
+      ${urgTag}${statusTag}${catTag}
+      <button class="task-pill-del" onclick="removeTask('${t.id}')" title="永久刪除">×</button>
+    </div>`;
+  }
+
+  const completeBtn = `<button class="task-pill-done" onclick="completeTaskInPlace('${t.id}')" title="標記完成">✓</button>`;
+
+  return `<div class="task-pill" id="pill-${t.id}">
+    ${completeBtn}
     <span style="flex:1">${escHtml(t.text)}</span>
     ${urgTag}${statusTag}${catTag}
-    <button class="task-pill-del" onclick="removeTask('${t.id}')">×</button>
+    <button class="task-pill-del" onclick="removeTask('${t.id}')" title="刪除">×</button>
   </div>`;
 }
 
@@ -594,6 +752,8 @@ function bindDump() {
   };
   const tb = document.getElementById('triage-btn');
   if (tb) tb.onclick = startTriage;
+  const dt = document.getElementById('done-toggle-btn');
+  if (dt) dt.onclick = () => { UB.showDone = !UB.showDone; render(true); };
 }
 
 async function doAdd() {
@@ -620,6 +780,18 @@ async function doAddAndTriage() {
 
 async function removeTask(id) {
   await deleteTask(id);
+  await render();
+}
+
+async function completeTaskInPlace(id) {
+  // 先做動畫
+  const pill = document.getElementById('pill-' + id);
+  if (pill) {
+    pill.style.transition = 'opacity 0.3s, transform 0.3s';
+    pill.style.opacity = '0';
+    pill.style.transform = 'translateX(8px)';
+  }
+  await updateTask(id, { done: true });
   await render();
 }
 
@@ -907,7 +1079,7 @@ function pauseTimer() {
 
 async function completeTask() {
   clearInterval(UB._interval); UB.timerRunning = false;
-  if (UB.focusTask) await deleteTask(UB.focusTask.id);
+  if (UB.focusTask) await updateTask(UB.focusTask.id, { done: true });
   UB.focusTask = null; UB.phase = 'dump';
   await render();
 }
@@ -1063,6 +1235,151 @@ async function addCategory() {
   nameEl.value = ''; emojiEl.value = '';
   await loadCategories();
   renderCatList();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// KANBAN VIEW
+// ════════════════════════════════════════════════════════════════════════════
+function kanbanHTML() {
+  // 欄位定義
+  const COLUMNS = [
+    {
+      id: 'urgent',
+      label: '🔴 今天必做',
+      color: '#ef4444',
+      bg: 'rgba(239,68,68,0.08)',
+      borderColor: 'rgba(239,68,68,0.25)',
+      filter: t => !t.done && t.urgency === 'urgent',
+    },
+    {
+      id: 'quick-win',
+      label: '🟢 立即可做',
+      color: '#2DD4A7',
+      bg: 'rgba(45,212,167,0.06)',
+      borderColor: 'rgba(45,212,167,0.2)',
+      filter: t => !t.done && t.urgency !== 'urgent' && t.status === 'quick-win',
+    },
+    {
+      id: 'soon',
+      label: '🟡 本週做',
+      color: '#d97706',
+      bg: 'rgba(245,158,11,0.06)',
+      borderColor: 'rgba(245,158,11,0.2)',
+      filter: t => !t.done && t.urgency === 'soon' && t.status !== 'quick-win',
+    },
+    {
+      id: 'low',
+      label: '⚪ 低優先',
+      color: '#6B7280',
+      bg: 'rgba(107,114,128,0.04)',
+      borderColor: 'rgba(107,114,128,0.15)',
+      filter: t => !t.done && (t.urgency === 'whenever' || t.urgency === null) && t.status !== 'quick-win' && t.urgency !== 'soon',
+    },
+  ];
+
+  const totalActive = UB.tasks.filter(t => !t.done).length;
+  const totalDone   = UB.tasks.filter(t => t.done).length;
+
+  const colsHTML = COLUMNS.map(col => {
+    const items = UB.tasks.filter(col.filter);
+    const cardsHTML = items.length === 0
+      ? `<div class="kanban-empty">無任務</div>`
+      : items.map(t => kanbanCardHTML(t, col)).join('');
+
+    return `
+      <div class="kanban-col">
+        <div class="kanban-col-header" style="color:${col.color}">
+          ${col.label}
+          <span class="kanban-col-count">${items.length}</span>
+        </div>
+        <div style="flex:1">${cardsHTML}</div>
+      </div>`;
+  }).join('');
+
+  // 已完成摺疊
+  const doneTasks = UB.tasks.filter(t => t.done);
+  const doneArrow = UB.showDone ? '▾' : '▸';
+  const doneGridHTML = UB.showDone && doneTasks.length > 0
+    ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:12px">
+        ${doneTasks.map(t => `
+          <div style="
+            background:var(--panel);border:1px solid var(--border);border-radius:8px;
+            padding:10px 14px;opacity:0.5;display:flex;align-items:center;gap:8px;
+          ">
+            <span style="font-size:11px;color:var(--text-3);flex:1;text-decoration:line-through">${escHtml(t.text)}</span>
+            <button onclick="removeTask('${t.id}')" style="
+              background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px;padding:0;
+            " title="刪除">×</button>
+          </div>`).join('')}
+      </div>` : '';
+
+  return `
+    <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:13px;color:var(--text-2)">${totalActive} 件進行中</span>
+      ${totalDone > 0 ? `<span style="font-size:12px;color:var(--text-3)">· ${totalDone} 件已完成</span>` : ''}
+      <button onclick="switchView('list')" style="
+        margin-left:auto;background:none;border:1px solid var(--border);border-radius:6px;
+        padding:5px 12px;font-family:'DM Mono',monospace;font-size:11px;
+        color:var(--text-3);cursor:pointer;transition:all 0.15s;
+      " onmouseover="this.style.borderColor='var(--border-2)';this.style.color='var(--text)'"
+         onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-3)'">
+        + 新增任務（切換清單模式）
+      </button>
+    </div>
+
+    <div class="kanban-board">${colsHTML}</div>
+
+    ${doneTasks.length > 0 ? `
+      <button class="done-toggle" id="done-toggle-btn" style="margin-top:24px">
+        ${doneArrow} 已完成
+        <span class="group-count" style="text-transform:none;letter-spacing:0">${doneTasks.length} 件</span>
+        <div class="done-toggle-line"></div>
+      </button>
+      ${doneGridHTML}
+    ` : ''}`;
+}
+
+function kanbanCardHTML(t, col) {
+  const meta    = t.status ? STATUS_META[t.status] : null;
+  const urgMeta = t.urgency ? URGENCY_META[t.urgency] : null;
+  const cat     = t.categoryId ? catById(t.categoryId) : null;
+
+  const statusTag = meta && col.id !== 'urgent'
+    ? `<span class="tag" style="background:${meta.bg};color:${meta.color};font-size:10px">${meta.label}</span>` : '';
+  const catTag = cat
+    ? `<span class="tag" style="background:var(--bg);color:var(--text-3);border:1px solid var(--border);font-size:10px">${cat.emoji} ${escHtml(cat.label)}</span>` : '';
+
+  return `
+    <div class="kanban-card" style="border-left:3px solid ${col.borderColor}">
+      <div class="kanban-card-title">${escHtml(t.text)}</div>
+      <div class="kanban-card-tags">${statusTag}${catTag}</div>
+      <div class="kanban-card-actions">
+        <button class="kanban-action-btn complete" onclick="completeTaskInPlace('${t.id}')">✓ 完成</button>
+        <button class="kanban-action-btn" onclick="removeTask('${t.id}')">× 刪除</button>
+        <button class="kanban-action-btn" onclick="focusOnTask('${t.id}')">▶ 專注</button>
+      </div>
+    </div>`;
+}
+
+function bindKanban() {
+  const dt = document.getElementById('done-toggle-btn');
+  if (dt) dt.onclick = () => { UB.showDone = !UB.showDone; render(true); };
+}
+
+async function focusOnTask(id) {
+  const task = UB.tasks.find(t => t.id === id);
+  if (!task) return;
+  UB.focusTask = task;
+  UB.timerSec = 300; UB.timerRunning = false; UB.timerDone = false;
+  UB.view = 'list';
+  UB.phase = 'focus';
+  // 更新 tab UI
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view-tab')[0]?.classList.add('active');
+  const app = document.getElementById('app');
+  app.innerHTML = focusHTML();
+  bindFocus();
+  document.getElementById('topbar-phase').textContent = 'Focus';
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
