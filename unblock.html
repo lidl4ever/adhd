@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ADHD Unblock — YJ</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;600&display=swap');
 
@@ -252,6 +253,31 @@ body {
   padding: 28px 0; border: 1px dashed var(--border); border-radius: 8px;
   opacity: 0.5; font-family: 'DM Mono', monospace;
 }
+
+/* ── Drag & Drop ── */
+.kcard.sortable-ghost {
+  opacity: 0.25;
+  border: 2px dashed var(--border-2) !important;
+  box-shadow: none !important;
+  background: var(--panel) !important;
+}
+.kcard.sortable-drag {
+  opacity: 1;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
+  transform: rotate(1.5deg);
+  cursor: grabbing !important;
+}
+.kanban-drop-zone {
+  min-height: 80px;
+  border-radius: 8px;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.kanban-drop-zone.drag-over {
+  background: rgba(0,0,0,0.03);
+  box-shadow: inset 0 0 0 2px var(--border-2);
+}
+.kcard { cursor: grab; }
+.kcard:active { cursor: grabbing; }
 
 /* ── Choice buttons ── */
 .choice-row { display: flex; gap: 6px; }
@@ -1381,18 +1407,19 @@ function kanbanHTML() {
 
   const colsHTML = KANBAN_COLS.map(col => {
     const items = UB.tasks.filter(col.filter);
-    const cardsHTML = items.length === 0
-      ? `<div class="kanban-empty">無任務</div>`
-      : items.map(t => kanbanCardHTML(t, col)).join('');
+    const cardsHTML = items.map(t => kanbanCardHTML(t, col)).join('');
 
     return `
       <div class="kanban-col">
         <div class="kanban-col-header">
           <span class="kanban-col-icon">${statusSVG(col.id)}</span>
           <span class="kanban-col-label" style="color:${col.labelColor}">${col.label}</span>
-          <span class="kanban-col-count">${items.length}</span>
+          <span class="kanban-col-count" id="col-count-${col.id}">${items.length}</span>
         </div>
-        <div>${cardsHTML}</div>
+        <div class="kanban-drop-zone" data-col="${col.id}">
+          ${cardsHTML}
+          ${items.length === 0 ? `<div class="kanban-empty" data-empty="${col.id}">無任務</div>` : ''}
+        </div>
       </div>`;
   }).join('');
 
@@ -1444,7 +1471,7 @@ function kanbanCardHTML(t, col) {
     ? `<span class="kcard-tag" style="background:var(--panel);color:var(--text-3);border:1px solid var(--border)">${cat.emoji} ${escHtml(cat.label)}</span>` : '';
 
   return `
-    <div class="kcard">
+    <div class="kcard" data-id="${t.id}">
       <div class="kcard-body">
         <div class="kcard-title">${escHtml(t.text)}</div>
         <div class="kcard-meta">${urgTag}${statTag}${catTag}</div>
@@ -1453,9 +1480,121 @@ function kanbanCardHTML(t, col) {
     </div>`;
 }
 
+// 欄位 → 更新任務的 urgency/status 映射
+const COL_UPDATE = {
+  urgent: { urgency: 'urgent' },
+  quick:  { urgency: 'soon',     status: 'quick-win' },
+  soon:   { urgency: 'soon' },
+  low:    { urgency: 'whenever' },
+};
+
 function bindKanban() {
   const dt = document.getElementById('done-toggle-btn');
   if (dt) dt.onclick = () => { UB.showDone = !UB.showDone; render(true); };
+
+  // 初始化每個 drop zone 的 SortableJS
+  document.querySelectorAll('.kanban-drop-zone').forEach(zone => {
+    const colId = zone.dataset.col;
+
+    Sortable.create(zone, {
+      group: 'kanban',          // 同一 group 才能跨欄拖拉
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      dragClass: 'sortable-drag',
+      draggable: '.kcard',
+      delay: 80,                // 手機長按觸發
+      delayOnTouchOnly: true,
+
+      // 拖拉時 highlight drop zone
+      onDragOver({ to }) {
+        document.querySelectorAll('.kanban-drop-zone').forEach(z => z.classList.remove('drag-over'));
+        to.classList.add('drag-over');
+      },
+
+      // 卡片放到新欄位時觸發
+      onEnd({ item, to, from }) {
+        document.querySelectorAll('.kanban-drop-zone').forEach(z => z.classList.remove('drag-over'));
+
+        const taskId  = item.dataset.id;
+        const newCol  = to.dataset.col;
+        const oldCol  = from.dataset.col;
+        if (!taskId || newCol === oldCol) {
+          updateEmptyPlaceholders();
+          return;
+        }
+
+        const fields = COL_UPDATE[newCol];
+        if (!fields) return;
+
+        // 樂觀更新本地 state
+        const task = UB.tasks.find(t => t.id === taskId);
+        if (task) {
+          if (fields.urgency) task.urgency = fields.urgency;
+          if (fields.status)  task.status  = fields.status;
+          // 若從 quick-win 欄拖出，且新欄不是 quick，清掉 quick-win status
+          if (oldCol === 'quick' && newCol !== 'quick' && task.status === 'quick-win') {
+            task.status = 'defer';
+            fields.status = 'defer';
+          }
+        }
+
+        // 更新欄位計數和 placeholder
+        updateEmptyPlaceholders();
+        updateColCounts();
+
+        // 更新 tags 顯示（不重新整個 render，保持拖拉流暢）
+        updateCardTags(item, task, newCol);
+
+        // 非同步存 Supabase
+        const saveFields = { urgency: fields.urgency };
+        if ('status' in fields) saveFields.status = fields.status;
+        updateTask(taskId, saveFields).catch(e => console.error('drag save failed:', e));
+      },
+    });
+  });
+}
+
+function updateEmptyPlaceholders() {
+  document.querySelectorAll('.kanban-drop-zone').forEach(zone => {
+    const colId = zone.dataset.col;
+    const hasCards = zone.querySelectorAll('.kcard').length > 0;
+    let empty = zone.querySelector('.kanban-empty');
+    if (hasCards && empty) {
+      empty.remove();
+    } else if (!hasCards && !empty) {
+      const div = document.createElement('div');
+      div.className = 'kanban-empty';
+      div.dataset.empty = colId;
+      div.textContent = '無任務';
+      zone.appendChild(div);
+    }
+  });
+}
+
+function updateColCounts() {
+  KANBAN_COLS.forEach(col => {
+    const zone = document.querySelector(`.kanban-drop-zone[data-col="${col.id}"]`);
+    const cnt  = document.getElementById(`col-count-${col.id}`);
+    if (zone && cnt) cnt.textContent = zone.querySelectorAll('.kcard').length;
+  });
+}
+
+function updateCardTags(cardEl, task, colId) {
+  if (!task) return;
+  const col     = KANBAN_COLS.find(c => c.id === colId);
+  const meta    = task.status ? STATUS_META[task.status] : null;
+  const urgMeta = task.urgency ? URGENCY_META[task.urgency] : null;
+  const cat     = task.categoryId ? catById(task.categoryId) : null;
+
+  const showUrgTag  = urgMeta && colId !== 'urgent';
+  const showStatTag = meta && colId !== 'quick';
+
+  const urgTag  = showUrgTag  ? `<span class="kcard-tag" style="background:${urgMeta.bg};color:${urgMeta.color}">${urgMeta.label}</span>` : '';
+  const statTag = showStatTag ? `<span class="kcard-tag" style="background:${meta.bg};color:${meta.color}">${meta.label}</span>` : '';
+  const catTag  = cat         ? `<span class="kcard-tag" style="background:var(--panel);color:var(--text-3);border:1px solid var(--border)">${cat.emoji} ${escHtml(cat.label)}</span>` : '';
+
+  const metaEl = cardEl.querySelector('.kcard-meta');
+  if (metaEl) metaEl.innerHTML = urgTag + statTag + catTag;
 }
 
 async function focusOnTask(id) {
