@@ -60,6 +60,10 @@ body {
   margin: 0 auto;
   padding: 48px 24px 80px;
 }
+.page.kanban-mode {
+  max-width: none;
+  padding: 24px 28px 40px;
+}
 
 /* ── Section header ── */
 .section-head {
@@ -119,11 +123,16 @@ body {
 }
 .task-pill.done-pill { opacity: 0.45; }
 .task-pill-done {
-  background: none; border: none; color: var(--text-3);
-  cursor: pointer; font-size: 15px; padding: 0 2px;
-  flex-shrink: 0; transition: color 0.15s; line-height: 1;
+  width: 18px; height: 18px; flex-shrink: 0;
+  border: 1.5px solid var(--border-2); border-radius: 50%;
+  background: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, background 0.15s;
+  font-size: 11px; color: transparent; line-height: 1;
 }
-.task-pill-done:hover { color: var(--green); }
+.task-pill-done:hover {
+  border-color: #2DD4A7; background: rgba(45,212,167,0.1); color: #2DD4A7;
+}
 .task-pill-del {
   background: none; border: none; color: var(--text-3);
   cursor: pointer; font-size: 16px; padding: 0 4px;
@@ -144,55 +153,104 @@ body {
 .done-toggle-line { flex: 1; height: 1px; background: var(--border); }
 
 /* ── Kanban ── */
-.kanban-board {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-top: 24px;
+.kanban-wrap {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  min-height: calc(100vh - 120px);
+  padding-bottom: 40px;
 }
-@media (max-width: 900px) { .kanban-board { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px) { .kanban-board { grid-template-columns: 1fr; } }
-
 .kanban-col {
-  display: flex; flex-direction: column; gap: 0;
-  min-height: 200px;
+  display: flex; flex-direction: column;
+  min-width: 260px; max-width: 320px; flex: 1;
+  padding-right: 24px;
+  border-right: 1px solid var(--border);
 }
+.kanban-col:last-child { border-right: none; padding-right: 0; }
+.kanban-col + .kanban-col { padding-left: 24px; }
+
 .kanban-col-header {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
-  text-transform: uppercase; margin-bottom: 10px; color: var(--text-3);
+  display: flex; align-items: center; gap-6px;
+  margin-bottom: 12px; padding-left: 2px;
+}
+.kanban-col-icon { flex-shrink: 0; }
+.kanban-col-label {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--text-3);
+  margin-left: 6px;
 }
 .kanban-col-count {
-  font-size: 10px; padding: 2px 7px; border-radius: 10px;
-  background: var(--panel); color: var(--text-3); margin-left: auto;
+  font-size: 11px; color: var(--text-3); margin-left: 4px;
 }
-.kanban-card {
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: 8px; padding: 12px 14px; margin-bottom: 8px;
-  cursor: default; transition: box-shadow 0.15s, border-color 0.15s;
+/* ── Kanban Card (hermes-style) ── */
+.kcard {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  margin-bottom: 8px;
   position: relative;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  cursor: default;
+  overflow: hidden;
 }
-.kanban-card:hover { border-color: var(--border-2); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.kanban-card-title { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 8px; }
-.kanban-card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
-.kanban-card-actions {
-  display: flex; gap: 4px; margin-top: 10px; opacity: 0;
-  transition: opacity 0.15s;
+.kcard:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.09);
+  border-color: var(--border-2);
 }
-.kanban-card:hover .kanban-card-actions { opacity: 1; }
-.kanban-action-btn {
-  font-size: 11px; padding: 4px 8px; border-radius: 4px;
-  border: 1px solid var(--border); background: var(--bg);
-  color: var(--text-3); cursor: pointer; font-family: 'DM Mono', monospace;
-  transition: all 0.15s;
+.kcard-body { padding: 14px 36px 14px 14px; }
+.kcard-title {
+  font-size: 13px; font-weight: 500; color: var(--text);
+  line-height: 1.5; font-family: 'DM Sans', sans-serif;
 }
-.kanban-action-btn:hover { border-color: var(--border-2); color: var(--text); }
-.kanban-action-btn.complete { color: var(--green); border-color: rgba(45,212,167,0.3); }
-.kanban-action-btn.complete:hover { background: rgba(45,212,167,0.1); border-color: var(--green); }
+.kcard-meta {
+  display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px;
+}
+.kcard-tag {
+  display: inline-flex; align-items: center;
+  padding: 2px 7px; border-radius: 4px;
+  font-size: 10px; font-weight: 500; font-family: 'DM Mono', monospace;
+}
+/* ··· button — absolute top right, always visible on hover */
+.kcard-menu-btn {
+  position: absolute; top: 8px; right: 8px;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px; border: 1px solid transparent;
+  background: rgba(255,255,255,0.85);
+  color: var(--text-3); cursor: pointer;
+  font-size: 16px; line-height: 1; letter-spacing: 1px;
+  opacity: 0; transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+.kcard:hover .kcard-menu-btn { opacity: 1; }
+.kcard-menu-btn:hover {
+  background: #fff; border-color: var(--border);
+  color: var(--text);
+}
+/* context dropdown */
+.kcard-dropdown {
+  position: fixed; z-index: 300;
+  background: #fff; border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  min-width: 140px;
+}
+.kcard-dropdown-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 5px;
+  font-size: 12px; font-family: 'DM Mono', monospace;
+  color: var(--text-2); cursor: pointer; border: none;
+  background: none; width: 100%; text-align: left;
+  transition: background 0.1s;
+}
+.kcard-dropdown-item:hover { background: var(--panel); color: var(--text); }
+.kcard-dropdown-item.danger { color: #ef4444; }
+.kcard-dropdown-item.danger:hover { background: rgba(239,68,68,0.08); }
+
 .kanban-empty {
   font-size: 12px; color: var(--text-3); text-align: center;
-  padding: 24px 0; border: 1px dashed var(--border); border-radius: 8px;
-  opacity: 0.6;
+  padding: 28px 0; border: 1px dashed var(--border); border-radius: 8px;
+  opacity: 0.5; font-family: 'DM Mono', monospace;
 }
 
 /* ── Choice buttons ── */
@@ -558,6 +616,8 @@ function switchView(v) {
   document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
   const idx = v === 'list' ? 0 : 1;
   document.querySelectorAll('.view-tab')[idx]?.classList.add('active');
+  const page = document.querySelector('.page');
+  if (page) page.classList.toggle('kanban-mode', v === 'kanban');
   render(true);
 }
 
@@ -573,6 +633,10 @@ async function render(skipLoad) {
   const phases = { dump: 'Dump', triage: 'Triage', focus: 'Focus' };
   document.getElementById('topbar-phase').textContent =
     UB.view === 'kanban' ? 'Kanban' : (phases[UB.phase] || '');
+
+  // 確保 page class 與 view 同步
+  const _page = document.querySelector('.page');
+  if (_page) _page.classList.toggle('kanban-mode', UB.view === 'kanban');
 
   // 看板 view 不受 phase 控制
   if (UB.view === 'kanban') {
@@ -734,7 +798,9 @@ function pillHTML(t, isDoneView = false) {
     </div>`;
   }
 
-  const completeBtn = `<button class="task-pill-done" onclick="completeTaskInPlace('${t.id}')" title="標記完成">✓</button>`;
+  const completeBtn = `<button class="task-pill-done" onclick="completeTaskInPlace('${t.id}')" title="標記完成">
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>`;
 
   return `<div class="task-pill" id="pill-${t.id}">
     ${completeBtn}
@@ -1238,49 +1304,82 @@ async function addCategory() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// KANBAN VIEW
+// KANBAN VIEW  (hermes-style)
 // ════════════════════════════════════════════════════════════════════════════
-function kanbanHTML() {
-  // 欄位定義
-  const COLUMNS = [
-    {
-      id: 'urgent',
-      label: '🔴 今天必做',
-      color: '#ef4444',
-      bg: 'rgba(239,68,68,0.08)',
-      borderColor: 'rgba(239,68,68,0.25)',
-      filter: t => !t.done && t.urgency === 'urgent',
-    },
-    {
-      id: 'quick-win',
-      label: '🟢 立即可做',
-      color: '#2DD4A7',
-      bg: 'rgba(45,212,167,0.06)',
-      borderColor: 'rgba(45,212,167,0.2)',
-      filter: t => !t.done && t.urgency !== 'urgent' && t.status === 'quick-win',
-    },
-    {
-      id: 'soon',
-      label: '🟡 本週做',
-      color: '#d97706',
-      bg: 'rgba(245,158,11,0.06)',
-      borderColor: 'rgba(245,158,11,0.2)',
-      filter: t => !t.done && t.urgency === 'soon' && t.status !== 'quick-win',
-    },
-    {
-      id: 'low',
-      label: '⚪ 低優先',
-      color: '#6B7280',
-      bg: 'rgba(107,114,128,0.04)',
-      borderColor: 'rgba(107,114,128,0.15)',
-      filter: t => !t.done && (t.urgency === 'whenever' || t.urgency === null) && t.status !== 'quick-win' && t.urgency !== 'soon',
-    },
-  ];
 
+// SVG status icons matching hermes StatusIcon
+function statusSVG(colId) {
+  if (colId === 'urgent') return `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#ef4444" stroke-width="1.5"/><path d="M7 1.5a5.5 5.5 0 0 1 0 11V1.5z" fill="#ef4444"/></svg>`;
+  if (colId === 'soon')   return `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#f59e0b" stroke-width="1.5"/><path d="M7 1.5a5.5 5.5 0 0 1 0 11V1.5z" fill="#f59e0b"/></svg>`;
+  if (colId === 'quick')  return `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#2DD4A7" stroke-width="1.5"/><path d="M7 1.5a5.5 5.5 0 0 1 0 11V1.5z" fill="#2DD4A7"/></svg>`;
+  return `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#9ca3af" stroke-width="1.5"/></svg>`;
+}
+
+const KANBAN_COLS = [
+  {
+    id: 'urgent',
+    label: '今天必做',
+    labelColor: '#ef4444',
+    filter: t => !t.done && t.urgency === 'urgent',
+  },
+  {
+    id: 'quick',
+    label: '立即可做',
+    labelColor: '#2DD4A7',
+    filter: t => !t.done && t.urgency !== 'urgent' && t.status === 'quick-win',
+  },
+  {
+    id: 'soon',
+    label: '本週做',
+    labelColor: '#d97706',
+    filter: t => !t.done && t.urgency === 'soon' && t.status !== 'quick-win',
+  },
+  {
+    id: 'low',
+    label: '低優先',
+    labelColor: '#9ca3af',
+    filter: t => !t.done && (t.urgency === 'whenever' || t.urgency === null) && t.status !== 'quick-win',
+  },
+];
+
+// Active dropdown state
+let _kDropdown = null; // { taskId, el }
+
+function closeKDropdown() {
+  if (_kDropdown) { _kDropdown.el.remove(); _kDropdown = null; }
+}
+
+function openKDropdown(taskId, btn) {
+  closeKDropdown();
+  const rect = btn.getBoundingClientRect();
+  const dd = document.createElement('div');
+  dd.className = 'kcard-dropdown';
+  dd.style.top  = (rect.bottom + 4) + 'px';
+  dd.style.left = Math.min(rect.left, window.innerWidth - 160) + 'px';
+  dd.innerHTML = `
+    <button class="kcard-dropdown-item" onclick="completeTaskInPlace('${taskId}');closeKDropdown()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#2DD4A7" stroke-width="1.5" stroke-linecap="round"/></svg>
+      標記完成
+    </button>
+    <button class="kcard-dropdown-item" onclick="focusOnTask('${taskId}');closeKDropdown()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/><polygon points="5,3.5 5,8.5 9,6" fill="currentColor"/></svg>
+      專注模式
+    </button>
+    <button class="kcard-dropdown-item danger" onclick="removeTask('${taskId}');closeKDropdown()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      刪除
+    </button>`;
+  document.body.appendChild(dd);
+  _kDropdown = { taskId, el: dd };
+  // close on outside click
+  setTimeout(() => document.addEventListener('click', closeKDropdown, { once: true }), 0);
+}
+
+function kanbanHTML() {
   const totalActive = UB.tasks.filter(t => !t.done).length;
   const totalDone   = UB.tasks.filter(t => t.done).length;
 
-  const colsHTML = COLUMNS.map(col => {
+  const colsHTML = KANBAN_COLS.map(col => {
     const items = UB.tasks.filter(col.filter);
     const cardsHTML = items.length === 0
       ? `<div class="kanban-empty">無任務</div>`
@@ -1288,76 +1387,69 @@ function kanbanHTML() {
 
     return `
       <div class="kanban-col">
-        <div class="kanban-col-header" style="color:${col.color}">
-          ${col.label}
+        <div class="kanban-col-header">
+          <span class="kanban-col-icon">${statusSVG(col.id)}</span>
+          <span class="kanban-col-label" style="color:${col.labelColor}">${col.label}</span>
           <span class="kanban-col-count">${items.length}</span>
         </div>
-        <div style="flex:1">${cardsHTML}</div>
+        <div>${cardsHTML}</div>
       </div>`;
   }).join('');
 
   // 已完成摺疊
   const doneTasks = UB.tasks.filter(t => t.done);
   const doneArrow = UB.showDone ? '▾' : '▸';
-  const doneGridHTML = UB.showDone && doneTasks.length > 0
-    ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:12px">
+  const doneCardsHTML = UB.showDone && doneTasks.length > 0
+    ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px">
         ${doneTasks.map(t => `
           <div style="
-            background:var(--panel);border:1px solid var(--border);border-radius:8px;
-            padding:10px 14px;opacity:0.5;display:flex;align-items:center;gap:8px;
+            background:#fff;border:1px solid var(--border);border-radius:8px;
+            padding:10px 12px;min-width:180px;flex:0 1 220px;
+            display:flex;align-items:flex-start;gap:8px;opacity:0.55;
           ">
-            <span style="font-size:11px;color:var(--text-3);flex:1;text-decoration:line-through">${escHtml(t.text)}</span>
-            <button onclick="removeTask('${t.id}')" style="
-              background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px;padding:0;
-            " title="刪除">×</button>
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style="margin-top:2px;flex-shrink:0"><circle cx="7" cy="7" r="6" fill="#22c55e"/><path d="M4.5 7l2 2 3.5-3.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span style="font-size:12px;color:var(--text-3);flex:1;text-decoration:line-through;line-height:1.5">${escHtml(t.text)}</span>
+            <button onclick="removeTask('${t.id}')" style="background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px;padding:0;line-height:1;flex-shrink:0" title="刪除">×</button>
           </div>`).join('')}
       </div>` : '';
 
   return `
-    <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px">
-      <span style="font-size:13px;color:var(--text-2)">${totalActive} 件進行中</span>
-      ${totalDone > 0 ? `<span style="font-size:12px;color:var(--text-3)">· ${totalDone} 件已完成</span>` : ''}
-      <button onclick="switchView('list')" style="
-        margin-left:auto;background:none;border:1px solid var(--border);border-radius:6px;
-        padding:5px 12px;font-family:'DM Mono',monospace;font-size:11px;
-        color:var(--text-3);cursor:pointer;transition:all 0.15s;
-      " onmouseover="this.style.borderColor='var(--border-2)';this.style.color='var(--text)'"
-         onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-3)'">
-        + 新增任務（切換清單模式）
-      </button>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <span style="font-size:12px;color:var(--text-3);font-family:'DM Mono',monospace">${totalActive} 件進行中${totalDone > 0 ? ' · ' + totalDone + ' 件已完成' : ''}</span>
     </div>
-
-    <div class="kanban-board">${colsHTML}</div>
-
+    <div class="kanban-wrap">${colsHTML}</div>
     ${doneTasks.length > 0 ? `
-      <button class="done-toggle" id="done-toggle-btn" style="margin-top:24px">
+      <button class="done-toggle" id="done-toggle-btn" style="margin-top:28px">
         ${doneArrow} 已完成
         <span class="group-count" style="text-transform:none;letter-spacing:0">${doneTasks.length} 件</span>
         <div class="done-toggle-line"></div>
       </button>
-      ${doneGridHTML}
-    ` : ''}`;
+      ${doneCardsHTML}` : ''}`;
 }
 
 function kanbanCardHTML(t, col) {
-  const meta    = t.status ? STATUS_META[t.status] : null;
-  const urgMeta = t.urgency ? URGENCY_META[t.urgency] : null;
   const cat     = t.categoryId ? catById(t.categoryId) : null;
+  const urgMeta = t.urgency ? URGENCY_META[t.urgency] : null;
+  const meta    = t.status ? STATUS_META[t.status] : null;
 
-  const statusTag = meta && col.id !== 'urgent'
-    ? `<span class="tag" style="background:${meta.bg};color:${meta.color};font-size:10px">${meta.label}</span>` : '';
-  const catTag = cat
-    ? `<span class="tag" style="background:var(--bg);color:var(--text-3);border:1px solid var(--border);font-size:10px">${cat.emoji} ${escHtml(cat.label)}</span>` : '';
+  // only show tags that add info (skip urgency tag in urgent col, skip status in quick col)
+  const showUrgTag  = urgMeta && col.id !== 'urgent';
+  const showStatTag = meta && col.id !== 'quick';
+
+  const urgTag  = showUrgTag
+    ? `<span class="kcard-tag" style="background:${urgMeta.bg};color:${urgMeta.color}">${urgMeta.label}</span>` : '';
+  const statTag = showStatTag
+    ? `<span class="kcard-tag" style="background:${meta.bg};color:${meta.color}">${meta.label}</span>` : '';
+  const catTag  = cat
+    ? `<span class="kcard-tag" style="background:var(--panel);color:var(--text-3);border:1px solid var(--border)">${cat.emoji} ${escHtml(cat.label)}</span>` : '';
 
   return `
-    <div class="kanban-card" style="border-left:3px solid ${col.borderColor}">
-      <div class="kanban-card-title">${escHtml(t.text)}</div>
-      <div class="kanban-card-tags">${statusTag}${catTag}</div>
-      <div class="kanban-card-actions">
-        <button class="kanban-action-btn complete" onclick="completeTaskInPlace('${t.id}')">✓ 完成</button>
-        <button class="kanban-action-btn" onclick="removeTask('${t.id}')">× 刪除</button>
-        <button class="kanban-action-btn" onclick="focusOnTask('${t.id}')">▶ 專注</button>
+    <div class="kcard">
+      <div class="kcard-body">
+        <div class="kcard-title">${escHtml(t.text)}</div>
+        <div class="kcard-meta">${urgTag}${statTag}${catTag}</div>
       </div>
+      <button class="kcard-menu-btn" onclick="openKDropdown('${t.id}',this)" title="操作">···</button>
     </div>`;
 }
 
