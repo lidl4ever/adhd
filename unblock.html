@@ -117,14 +117,23 @@ body {
 
 /* ── Task pill ── */
 .task-pill {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: flex-start; gap: 8px;
   padding: 10px 14px;
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
   font-size: 13px; color: var(--text); transition: opacity 0.3s;
 }
 .task-pill.done-pill { opacity: 0.45; }
+.task-pill-content {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;
+}
+.task-pill-text {
+  font-size: 13px; color: var(--text); line-height: 1.5; word-break: break-word;
+}
+.task-pill-tags {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
 .task-pill-done {
-  width: 18px; height: 18px; flex-shrink: 0;
+  width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px;
   border: 1.5px solid var(--border-2); border-radius: 50%;
   background: none; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
@@ -137,7 +146,7 @@ body {
 .task-pill-del {
   background: none; border: none; color: var(--text-3);
   cursor: pointer; font-size: 16px; padding: 0 4px;
-  flex-shrink: 0; transition: color 0.15s;
+  flex-shrink: 0; transition: color 0.15s; margin-top: 0;
 }
 .task-pill-del:hover { color: var(--text); }
 
@@ -815,11 +824,15 @@ function pillHTML(t, isDoneView = false) {
   const catTag = cat
     ? `<span class="tag" style="background:var(--panel);color:var(--text-3);border:1px solid var(--border);flex-shrink:0">${cat.emoji} ${escHtml(cat.label)}</span>` : '';
 
+  const hasTags = urgTag || statusTag || catTag;
+
   if (isDoneView) {
     // 已完成：顯示刪除按鈕（永久移除）
     return `<div class="task-pill done-pill">
-      <span style="flex:1;text-decoration:line-through;color:var(--text-3)">${escHtml(t.text)}</span>
-      ${urgTag}${statusTag}${catTag}
+      <div class="task-pill-content">
+        <span class="task-pill-text" style="text-decoration:line-through;color:var(--text-3)">${escHtml(t.text)}</span>
+        ${hasTags ? `<div class="task-pill-tags">${urgTag}${statusTag}${catTag}</div>` : ''}
+      </div>
       <button class="task-pill-del" onclick="removeTask('${t.id}')" title="永久刪除">×</button>
     </div>`;
   }
@@ -830,8 +843,10 @@ function pillHTML(t, isDoneView = false) {
 
   return `<div class="task-pill" id="pill-${t.id}">
     ${completeBtn}
-    <span style="flex:1">${escHtml(t.text)}</span>
-    ${urgTag}${statusTag}${catTag}
+    <div class="task-pill-content">
+      <span class="task-pill-text">${escHtml(t.text)}</span>
+      ${hasTags ? `<div class="task-pill-tags">${urgTag}${statusTag}${catTag}</div>` : ''}
+    </div>
     <button class="task-pill-del" onclick="removeTask('${t.id}')" title="刪除">×</button>
   </div>`;
 }
