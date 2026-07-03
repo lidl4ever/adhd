@@ -1,0 +1,24 @@
+# XcodeGen 備援設定 — 若 ADHDCommand.xcodeproj 打不開（Xcode 15 以下），
+# 在 ios/ 目錄執行：brew install xcodegen && xcodegen
+# 會重新產生相容你 Xcode 版本的專案檔
+name: ADHDCommand
+options:
+  bundleIdPrefix: com.yj
+  deploymentTarget:
+    iOS: "16.4"
+targets:
+  ADHDCommand:
+    type: application
+    platform: iOS
+    sources: [ADHDCommand]
+    settings:
+      base:
+        INFOPLIST_KEY_CFBundleDisplayName: "YJ 指揮中心"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: 1
+        CODE_SIGN_STYLE: Automatic
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
