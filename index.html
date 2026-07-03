@@ -2,9 +2,17 @@
 <html lang="zh-TW" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>YJ — 今日指揮中心</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f7f6f3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="YJ">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<script src="lib/supabase.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -148,6 +156,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .status-item { flex-wrap: wrap; gap: 4px; }
   .status-role { min-width: 100%; font-size: 11px; }
   .status-label { margin-left: auto; }
+
+  /* iOS: 輸入框 <16px 會觸發自動放大，強制 16px */
+  input[type="text"], input:not([type]), textarea { font-size: 16px !important; }
 }
 
 /* Focus zone */
@@ -355,7 +366,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="runway-days" id="runway-days">計算中...</div>
     </div>
     <button class="topbar-link" onclick="showGate()" style="cursor:pointer;background:none;">切換模式</button>
-    <a class="topbar-link" href="/Users/ys/dev/career-ops/kanban.html">Kanban →</a>
+    <a class="topbar-link" href="unblock.html?view=kanban">Kanban →</a>
     <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()">☀️</button>
   </div>
 
@@ -492,7 +503,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
           <div class="goal-rank">🔴</div>
           <div style="flex:1">
             <div class="goal-text">找到帶 relocation 的歐洲工作</div>
-            <div class="goal-sub">生活費跑道剩約 65 天 · 第一優先</div>
+            <div class="goal-sub">生活費跑道見右上角 · 第一優先</div>
           </div>
           <span class="goal-tag goal-urgent">緊急</span>
         </div>
@@ -545,11 +556,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <!-- 動態生成 -->
     </div>
 
-    <a class="big-link" href="/Users/ys/dev/career-ops/kanban.html">
+    <a class="big-link" href="unblock.html?view=kanban">
       <div class="big-link-icon">📋</div>
       <div>
-        <div class="big-link-title">Job Search Kanban</div>
-        <div class="big-link-sub">50+ 職缺 · Pipeline → Evaluated → Applied → Interview</div>
+        <div class="big-link-title">任務看板</div>
+        <div class="big-link-sub">今天必做 → 立即可做 → 本週做 → 低優先</div>
       </div>
       <div class="big-link-arrow">→</div>
     </a>
@@ -590,16 +601,22 @@ function updateClock() {
 updateClock();
 setInterval(updateClock, 10000);
 
-// ─── RUNWAY ─────────────────────────────────────────────────────────────────
-(function() {
-  const saved = localStorage.getItem('runway-start');
-  const start = saved ? new Date(saved) : new Date();
-  if (!saved) localStorage.setItem('runway-start', start.toISOString());
-  const totalDays = 65;
-  const remaining = Math.max(0, totalDays - Math.floor((new Date() - start) / 86400000));
-  document.getElementById('runway-fill').style.width = (remaining / totalDays * 100) + '%';
+// ─── RUNWAY（以截止日計算，點擊天數可修改）───────────────────────────────────
+const RUNWAY_TOTAL = 65; // 進度條滿格基準
+function renderRunway() {
+  const deadline = load('runway-deadline', '2026-06-30');
+  const remaining = Math.max(0, Math.ceil((new Date(deadline + 'T23:59:59') - new Date()) / 86400000));
+  document.getElementById('runway-fill').style.width = Math.min(100, remaining / RUNWAY_TOTAL * 100) + '%';
   document.getElementById('runway-days').textContent = remaining + ' 天';
-})();
+}
+document.getElementById('runway-days').style.cursor = 'pointer';
+document.getElementById('runway-days').title = '點擊修改截止日';
+document.getElementById('runway-days').onclick = () => {
+  const cur = load('runway-deadline', '2026-06-30');
+  const v = prompt('生活費跑道截止日（YYYY-MM-DD）：', cur);
+  if (v && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) { save('runway-deadline', v.trim()); renderRunway(); }
+};
+renderRunway();
 
 // ─── MORNING GATE ────────────────────────────────────────────────────────────
 const FOCUS_LABELS = {
@@ -647,13 +664,14 @@ function saveFocusTask() {
   save('focus-task', document.getElementById('focus-input').value);
 }
 
-// ─── POMODORO ────────────────────────────────────────────────────────────────
+// ─── POMODORO（時間戳計時：分頁進背景/手機鎖屏也不會凍結）───────────────────
 let timerMin = 25, timerMode = 'work', timeLeft = 25*60, running = false, interval = null;
+let timerEndAt = null; // 結束的絕對時間（ms）
 let pomCount = load('pom-count-' + new Date().toDateString(), 0);
 document.getElementById('pom-count').textContent = '今日 ' + pomCount + ' 🍅';
 
 function setMode(min, mode, btn) {
-  timerMin = min; timerMode = mode; timeLeft = min*60; running = false;
+  timerMin = min; timerMode = mode; timeLeft = min*60; running = false; timerEndAt = null;
   clearInterval(interval);
   document.getElementById('start-btn').textContent = '開始';
   document.getElementById('timer-display').classList.remove('ticking');
@@ -661,36 +679,46 @@ function setMode(min, mode, btn) {
   document.querySelectorAll('.mode-pill').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 }
+function timerTick() {
+  timeLeft = Math.max(0, Math.round((timerEndAt - Date.now()) / 1000));
+  if (timeLeft <= 0) {
+    clearInterval(interval); running = false; timerEndAt = null;
+    document.getElementById('timer-display').classList.remove('ticking');
+    document.getElementById('start-btn').textContent = '開始';
+    if (timerMode === 'work') {
+      pomCount++;
+      save('pom-count-' + new Date().toDateString(), pomCount);
+      document.getElementById('pom-count').textContent = '今日 ' + pomCount + ' 🍅';
+    }
+    timeLeft = timerMin * 60;
+    updateTimerDisplay();
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    alert(timerMode === 'work' ? '🍅 完成！休息一下' : '⏰ 休息結束，繼續！');
+    return;
+  }
+  updateTimerDisplay();
+}
 function toggleTimer() {
   if (running) {
     clearInterval(interval); running = false;
+    timeLeft = Math.max(0, Math.round((timerEndAt - Date.now()) / 1000));
+    timerEndAt = null;
     document.getElementById('start-btn').textContent = '繼續';
     document.getElementById('timer-display').classList.remove('ticking');
   } else {
     running = true;
+    timerEndAt = Date.now() + timeLeft * 1000;
     document.getElementById('start-btn').textContent = '暫停';
     document.getElementById('timer-display').classList.add('ticking');
-    interval = setInterval(() => {
-      timeLeft--;
-      if (timeLeft <= 0) {
-        clearInterval(interval); running = false;
-        document.getElementById('timer-display').classList.remove('ticking');
-        document.getElementById('start-btn').textContent = '開始';
-        if (timerMode === 'work') {
-          pomCount++;
-          save('pom-count-' + new Date().toDateString(), pomCount);
-          document.getElementById('pom-count').textContent = '今日 ' + pomCount + ' 🍅';
-        }
-        timeLeft = timerMin * 60;
-        updateTimerDisplay();
-        alert(timerMode === 'work' ? '🍅 完成！休息一下' : '⏰ 休息結束，繼續！');
-      }
-      updateTimerDisplay();
-    }, 1000);
+    interval = setInterval(timerTick, 1000);
   }
 }
+// 從背景回到前景時立即校正顯示
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && running && timerEndAt) timerTick();
+});
 function resetTimer() {
-  clearInterval(interval); running = false; timeLeft = timerMin*60;
+  clearInterval(interval); running = false; timeLeft = timerMin*60; timerEndAt = null;
   document.getElementById('start-btn').textContent = '開始';
   document.getElementById('timer-display').classList.remove('ticking');
   updateTimerDisplay();
@@ -796,17 +824,25 @@ function renderTasks() {
   document.getElementById('tasks-done-count').textContent = doneCount > 0 ? `${doneCount}/${total} 完成` : '';
 }
 
-async function toggleTask(id, done) {
+// 樂觀更新：先改本地畫面，背景同步 Supabase，失敗時重新載入還原
+function syncOrReload(promise) {
+  promise.then(({ error }) => { if (error) { console.error(error); loadTasks(); } })
+         .catch(e => { console.error(e); loadTasks(); });
+}
+
+function toggleTask(id, done) {
+  const t = tasks.find(t => t.id === id);
+  if (t) { t.done = done; renderTasks(); }
   const update = done
     ? { done: true, completed_at: new Date().toISOString() }
     : { done: false, completed_at: null };
-  await supa.from('tasks').update(update).eq('id', id);
-  await loadTasks();
+  syncOrReload(supa.from('tasks').update(update).eq('id', id));
 }
 
-async function deleteTask(id) {
-  await supa.from('tasks').delete().eq('id', id);
-  await loadTasks();
+function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  renderTasks();
+  syncOrReload(supa.from('tasks').delete().eq('id', id));
 }
 
 async function addTask() {
@@ -814,8 +850,16 @@ async function addTask() {
   const val = input.value.trim();
   if (!val) return;
   input.value = '';
-  await supa.from('tasks').insert({ text: val, tag: '', done: false, sort_order: tasks.length });
-  await loadTasks();
+  const temp = { id: 'temp-' + Date.now(), text: val, tag: '', done: false, sort_order: tasks.length };
+  tasks.push(temp);
+  renderTasks();
+  const { data, error } = await supa.from('tasks')
+    .insert({ text: val, tag: '', done: false, sort_order: tasks.length - 1 })
+    .select().single();
+  if (error || !data) { console.error(error); await loadTasks(); return; }
+  const i = tasks.findIndex(t => t.id === temp.id);
+  if (i !== -1) tasks[i] = data;
+  renderTasks();
 }
 
 async function clearDoneTasks() {
@@ -959,9 +1003,10 @@ function setTip(i) { tipIdx = i; renderTip(); }
 setInterval(() => { tipIdx = (tipIdx+1) % TIPS.length; renderTip(); }, 30000);
 renderTip();
 
-
-
-
+// ─── PWA ─────────────────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW register failed:', e));
+}
 </script>
 </body>
 </html>

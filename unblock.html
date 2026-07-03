@@ -2,10 +2,18 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ADHD Unblock — YJ</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f7f6f3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="YJ">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<script src="lib/supabase.js"></script>
+<script src="lib/sortable.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;600&display=swap');
 
@@ -426,6 +434,11 @@ body {
 .add-cat-btn:hover { color: var(--text); border-color: var(--border-2); }
 
 ::placeholder { color: #b0aea8; }
+
+/* iOS: 輸入框 <16px 會觸發自動放大，強制 16px */
+@media (max-width: 600px) {
+  input, textarea { font-size: 16px !important; }
+}
 </style>
 </head>
 <body>
@@ -885,21 +898,25 @@ async function doAddAndTriage() {
   render(true);
 }
 
-async function removeTask(id) {
-  await deleteTask(id);
-  await render();
+function removeTask(id) {
+  // 樂觀更新：先改畫面，背景同步
+  UB.tasks = UB.tasks.filter(t => t.id !== id);
+  render(true);
+  deleteTask(id);
 }
 
-async function completeTaskInPlace(id) {
-  // 先做動畫
+function completeTaskInPlace(id) {
+  // 先做動畫，樂觀更新本地，背景同步
   const pill = document.getElementById('pill-' + id);
   if (pill) {
     pill.style.transition = 'opacity 0.3s, transform 0.3s';
     pill.style.opacity = '0';
     pill.style.transform = 'translateX(8px)';
   }
-  await updateTask(id, { done: true });
-  await render();
+  const t = UB.tasks.find(t => t.id === id);
+  if (t) t.done = true;
+  updateTask(id, { done: true });
+  setTimeout(() => render(true), 250);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1005,19 +1022,22 @@ function bindTriage() {
   const task = unc[UB.triageIdx];
   if (!task) return;
 
-  document.getElementById('blocker-btn').onclick = async () => {
-    await updateTask(task.id, { isBlocker: !task.isBlocker });
-    await render();
+  // 樂觀更新：選項點下去立即反應，背景同步 Supabase
+  document.getElementById('blocker-btn').onclick = () => {
+    task.isBlocker = !task.isBlocker;
+    updateTask(task.id, { isBlocker: task.isBlocker });
+    render(true);
   };
 
   document.querySelectorAll('[data-field]').forEach(btn => {
-    btn.onclick = async () => {
+    btn.onclick = () => {
       const field = btn.dataset.field;
       let val = btn.dataset.val;
       if (field === 'impact' || field === 'effort') val = parseInt(val);
       if (field === 'categoryId' && val === '__none__') val = null;
-      await updateTask(task.id, { [field]: val });
-      await render();
+      task[field] = val;
+      updateTask(task.id, { [field]: val });
+      render(true);
     };
   });
 
@@ -1025,14 +1045,15 @@ function bindTriage() {
   document.getElementById('back-btn').onclick = () => { UB.triageFilterIds = null; UB.phase = 'dump'; render(); };
 }
 
-async function confirmTriage() {
+function confirmTriage() {
   const unc  = getUnclassified();
   const task = unc[UB.triageIdx];
   if (!task || task.urgency === null || task.impact === null || task.effort === null) return;
 
+  // 樂觀更新：本地先分類，背景同步
   const newStatus = classify(task.impact, task.effort, task.isBlocker);
-  await updateTask(task.id, { status: newStatus });
-  await loadTasks();
+  task.status = newStatus;
+  updateTask(task.id, { status: newStatus });
 
   const remaining = getUnclassified().length;
   if (remaining === 0) {
@@ -1152,14 +1173,16 @@ function bindFocus() {
 
 function startTimer() {
   UB.timerRunning = true;
+  UB._endAt = Date.now() + UB.timerSec * 1000; // 時間戳計時：背景/鎖屏不凍結
   const app = document.getElementById('app');
   app.innerHTML = focusHTML();
   bindFocus();
   UB._interval = setInterval(() => {
-    UB.timerSec--;
+    UB.timerSec = Math.max(0, Math.round((UB._endAt - Date.now()) / 1000));
     if (UB.timerSec <= 0) {
       clearInterval(UB._interval);
       UB.timerRunning = false; UB.timerDone = true; UB.timerSec = 0;
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     }
     const ring  = document.querySelector('.timer-ring');
     const label = document.getElementById('timer-label');
@@ -1178,6 +1201,7 @@ function startTimer() {
 
 function pauseTimer() {
   clearInterval(UB._interval);
+  if (UB._endAt) UB.timerSec = Math.max(0, Math.round((UB._endAt - Date.now()) / 1000));
   UB.timerRunning = false;
   const app = document.getElementById('app');
   app.innerHTML = focusHTML();
@@ -1630,7 +1654,18 @@ async function focusOnTask(id) {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 initEmojiPicker();
+// 支援 ?view=kanban 直接開看板（index 的 Kanban 連結用）
+if (new URLSearchParams(location.search).get('view') === 'kanban') {
+  UB.view = 'kanban';
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view-tab')[1]?.classList.add('active');
+}
 render();
+
+// ── PWA ──────────────────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW register failed:', e));
+}
 </script>
 </body>
 </html>
